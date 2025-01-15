@@ -9,6 +9,7 @@ import (
 
 	"helm.sh/helm/v3/pkg/cli"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/jasonlvhit/gocron"
@@ -49,16 +50,30 @@ func main() {
 		}
 	})
 
+	log.Println("All jobs scheduled. Waiting for the scheduled times to run...")
 	gocron.Start()
 	select {}
 }
 
 func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
+	var config *rest.Config
+	var err error
+
+	// Try using local kubeconfig
 	kubeconfig := os.Getenv("KUBECONFIG")
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
-	if err != nil {
-		log.Fatalf("Error building Kubernetes config: %v", err)
+	if kubeconfig == "" {
+		kubeconfig = clientcmd.RecommendedHomeFile // Default kubeconfig path
 	}
+	config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		log.Printf("Could not use local kubeconfig: %v. Trying in-cluster configuration...", err)
+		// Fall back to in-cluster config
+		config, err = rest.InClusterConfig()
+		if err != nil {
+			log.Fatalf("Could not use in-cluster configuration: %v", err)
+		}
+	}
+
 	k8sClient := kubernetes.NewForConfigOrDie(config)
 	settings := cli.New()
 	return k8sClient, settings
