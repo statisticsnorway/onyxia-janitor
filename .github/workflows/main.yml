@@ -9,7 +9,7 @@ on:
       - "go.mod"
       - "go.sum"
       - "**/*.go"
-      - ".github/workflows/build.yml"
+      - ".github/workflows/main.yml"
   pull_request:
     branches:
       - "onyxia-janitor-poc" 
