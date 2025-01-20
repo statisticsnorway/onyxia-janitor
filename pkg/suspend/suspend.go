@@ -23,8 +23,8 @@ func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSetti
 	for _, namespace := range namespaces {
 		log.Printf("Processing namespace: %s", namespace)
 
-		os.Setenv("KUBERNETES_NAMESPACE", namespace)
 		actionConfig := new(action.Configuration)
+		helmSettings.SetNamespace(namespace)
 		if err := actionConfig.Init(helmSettings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
 			log.Printf("Error initializing Helm action configuration for namespace %s: %v", namespace, err)
 			continue
