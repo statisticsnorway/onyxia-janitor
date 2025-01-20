@@ -30,7 +30,7 @@ func main() {
 		"datadoc",
 	}
 
-	gocron.Every(1).Day().At("07:45").Do(func() {
+	gocron.Every(1).Day().At("06:55").Do(func() {
 		log.Println("Running 'Uninstall failed releases' job...")
 		if err := uninstall.UninstallFailedReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Uninstall failed releases' job: %v", err)
@@ -39,7 +39,7 @@ func main() {
 		}
 	})
 
-	gocron.Every(1).Day().At("08:10").Do(func() {
+	gocron.Every(1).Day().At("07:10").Do(func() {
 		log.Println("Running 'Suspend user services' job...")
 		if err := suspend.SuspendReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Suspend user services' job: %v", err)
