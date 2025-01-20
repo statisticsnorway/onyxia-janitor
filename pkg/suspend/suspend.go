@@ -3,6 +3,7 @@ package suspend
 import (
 	"log"
 	"onyxia-janitor/common"
+	"os"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/chart/loader"
@@ -22,6 +23,7 @@ func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSetti
 	for _, namespace := range namespaces {
 		log.Printf("Processing namespace: %s", namespace)
 
+		os.Setenv("KUBERNETES_NAMESPACE", namespace) // Ensure namespace context is set
 		actionConfig := new(action.Configuration)
 		if err := actionConfig.Init(helmSettings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
 			log.Printf("Error initializing Helm action configuration for namespace %s: %v", namespace, err)
