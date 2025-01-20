@@ -81,5 +81,6 @@ func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 
 	k8sClient := kubernetes.NewForConfigOrDie(config)
 	settings := cli.New()
+	settings.SetNamespace("")
 	return k8sClient, settings
 }

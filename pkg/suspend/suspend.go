@@ -13,7 +13,6 @@ import (
 
 const helmRepoURL = "https://statisticsnorway.github.io/dapla-lab-helm-charts-standard"
 
-// filter out namespaces with correct prefix (ssb-user-*)
 func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSettings, allowedCharts []string, prefix string) error {
 	namespaces, err := common.GetNamespacesWithPrefix(clientset, prefix)
 	if err != nil {
@@ -37,7 +36,6 @@ func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSetti
 	return nil
 }
 
-// gets the helm releases in the namespaces, if in allowedchart suspends service
 func processReleases(actionConfig *action.Configuration, namespace string, allowedCharts []string) error {
 	listAction := action.NewList(actionConfig)
 	listAction.AllNamespaces = false
@@ -61,8 +59,6 @@ func processReleases(actionConfig *action.Configuration, namespace string, allow
 	}
 	return nil
 }
-
-// suspends the releases found and validated
 
 func suspendRelease(actionConfig *action.Configuration, rel *release.Release) error {
 	log.Printf("Attempting to suspend release %s (chart: %s) in namespace %s", rel.Name, rel.Chart.Metadata.Name, rel.Namespace)
