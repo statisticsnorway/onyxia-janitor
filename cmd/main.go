@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"onyxia-janitor/pkg/suspend"
 	"onyxia-janitor/pkg/uninstall"
@@ -49,6 +50,7 @@ func main() {
 	})
 
 	log.Println("All jobs scheduled. Waiting for the scheduled times to run...")
+	log.Println("Current time:", time.Now())
 	gocron.Start()
 	select {}
 }
