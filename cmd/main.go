@@ -19,6 +19,8 @@ import (
 func main() {
 	log.Println("Starting Helm janitor process...")
 
+	log.Println("Current time:", time.Now())
+
 	k8sClient, settings := initializeKubernetesClient()
 
 	allowedCharts := []string{
@@ -29,6 +31,20 @@ func main() {
 		"jdemetra",
 		"jupyter-pyspark",
 		"datadoc",
+	}
+
+	log.Println("Running 'Uninstall failed releases' job immediately...")
+	if err := uninstall.UninstallFailedReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
+		log.Printf("Error during 'Uninstall failed releases' job: %v", err)
+	} else {
+		log.Println("'Uninstall failed releases' job completed successfully")
+	}
+
+	log.Println("Running 'Suspend user services' job immediately...")
+	if err := suspend.SuspendReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
+		log.Printf("Error during 'Suspend user services' job: %v", err)
+	} else {
+		log.Println("'Suspend user services' job completed successfully")
 	}
 
 	gocron.Every(1).Day().At("08:10").Do(func() {
@@ -50,7 +66,6 @@ func main() {
 	})
 
 	log.Println("All jobs scheduled. Waiting for the scheduled times to run...")
-	log.Println("Current time:", time.Now())
 	gocron.Start()
 	select {}
 }
