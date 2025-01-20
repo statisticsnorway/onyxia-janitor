@@ -32,14 +32,8 @@ func main() {
 		"jupyter-pyspark",
 		"datadoc",
 	}
-	log.Println("Running 'Suspend user services' job immediately...")
-	if err := suspend.SuspendReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
-		log.Printf("Error during 'Suspend user services' job: %v", err)
-	} else {
-		log.Println("'Suspend user services' job completed successfully")
-	}
 
-	gocron.Every(1).Day().At("08:33").Do(func() {
+	gocron.Every(1).Day().At("20:00").Do(func() {
 		log.Println("Running 'Uninstall failed releases' job...")
 		if err := uninstall.UninstallFailedReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Uninstall failed releases' job: %v", err)
@@ -48,7 +42,7 @@ func main() {
 		}
 	})
 
-	gocron.Every(1).Day().At("08:40").Do(func() {
+	gocron.Every(1).Day().At("22:00").Do(func() {
 		log.Println("Running 'Suspend user services' job...")
 		if err := suspend.SuspendReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Suspend user services' job: %v", err)
