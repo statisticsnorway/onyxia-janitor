@@ -14,8 +14,8 @@ spec:
     spec:
       containers:
       - name: onyxia-janitor
-        image: onyxia-janitor:latest
-        imagePullPolicy: Never
+        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:onyxia-janitor-poc-189a91da2e07fd0556abb2e8d08a6e705df4291e
+        imagePullPolicy: Always
         resources:
           requests:
             memory: "256Mi"
