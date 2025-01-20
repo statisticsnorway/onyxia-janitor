@@ -15,7 +15,7 @@ spec:
       serviceAccountName: helm-cronjob-sa
       containers:
       - name: onyxia-janitor
-        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:onyxia-janitor-poc-086dfb85634cbaf8d1bcf9629996656e28cbb169
+        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:onyxia-janitor-poc-7b74efc00fdcb2525cb189c67a3696034aeb1798
         resources:
           requests:
             memory: "256Mi"
