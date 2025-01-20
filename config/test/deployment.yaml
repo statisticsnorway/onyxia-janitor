@@ -12,10 +12,10 @@ spec:
       labels:
         app: onyxia-janitor
     spec:
+      serviceAccountName: helm-cronjob-sa
       containers:
       - name: onyxia-janitor
-        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:onyxia-janitor-poc-189a91da2e07fd0556abb2e8d08a6e705df4291e
-        imagePullPolicy: Always
+        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:onyxia-janitor-poc-7729c4752a451704b11aa6a891c725e0b9c5afc1
         resources:
           requests:
             memory: "256Mi"
