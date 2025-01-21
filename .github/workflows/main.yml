@@ -23,7 +23,7 @@ on:
 env:
   REGISTRY: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker
   IMAGE: onyxia-janitor
-  TAG: ${{ github.ref_name }}
+  TAG: ${{ github.sha }}
 
 jobs:
   docker:
