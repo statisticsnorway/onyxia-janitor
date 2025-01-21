@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - "onyxia-janitor-poc" 
+      - "onyxia-janitor" 
     paths:
       - "Dockerfile"
       - "go.mod"
@@ -12,13 +12,13 @@ on:
       - ".github/workflows/main.yml"
   pull_request:
     branches:
-      - "onyxia-janitor-poc" 
+      - "onyxia-janitor" 
     paths:
       - "Dockerfile"
       - "go.mod"
       - "go.sum"
       - "**/*.go"
-      - ".github/workflows/build.yml"
+      - ".github/workflows/main.yml"
 
 env:
   REGISTRY: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker
