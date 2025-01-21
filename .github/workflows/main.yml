@@ -1,18 +1,9 @@
 name: Build and Push Docker Image
 
 on:
-  push:
-    branches:
-      - "onyxia-janitor" 
-    paths:
-      - "Dockerfile"
-      - "go.mod"
-      - "go.sum"
-      - "**/*.go"
-      - ".github/workflows/main.yml"
   pull_request:
     branches:
-      - "onyxia-janitor" 
+      - "main"
     paths:
       - "Dockerfile"
       - "go.mod"
