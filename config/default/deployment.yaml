@@ -13,7 +13,7 @@ spec:
       labels:
         app: onyxia-janitor
     spec:
-      serviceAccountName: helm-cronjob-sa
+      serviceAccountName: onyxia-janitor-sa
       containers:
       - name: onyxia-janitor
         image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:latest
