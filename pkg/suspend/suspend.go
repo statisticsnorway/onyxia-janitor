@@ -69,7 +69,7 @@ func suspendRelease(actionConfig *action.Configuration, rel *release.Release) er
 
 	suspendValues := map[string]any{
 		"global": map[string]any{
-			"suspend": "true",
+			"suspend": true,
 		},
 	}
 
