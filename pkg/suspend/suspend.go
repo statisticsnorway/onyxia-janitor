@@ -67,18 +67,11 @@ func suspendRelease(actionConfig *action.Configuration, rel *release.Release) er
 
 	os.Setenv("KUBERNETES_NAMESPACE", rel.Namespace)
 
-	getValues := action.NewGetValues(actionConfig)
-	getValues.AllValues = true
-	currentValues, err := getValues.Run(rel.Name)
-	if err != nil {
-		log.Printf("Warning: Could not fetch current values for release %s: %v. Using empty values.", rel.Name, err)
-		currentValues = map[string]interface{}{}
+	suspendValues := map[string]any{
+		"global": map[string]any{
+			"suspend": "true",
+		},
 	}
-
-	if currentValues["global"] == nil {
-		currentValues["global"] = map[string]interface{}{}
-	}
-	currentValues["global"].(map[string]interface{})["suspend"] = true
 
 	chartPathOptions := action.ChartPathOptions{
 		RepoURL: helmRepoURL,
@@ -98,9 +91,10 @@ func suspendRelease(actionConfig *action.Configuration, rel *release.Release) er
 
 	upgradeAction := action.NewUpgrade(actionConfig)
 	upgradeAction.Namespace = rel.Namespace
+	upgradeAction.Version = rel.Chart.Metadata.Version
 	upgradeAction.ReuseValues = true
 
-	_, err = upgradeAction.Run(rel.Name, chart, currentValues)
+	_, err = upgradeAction.Run(rel.Name, chart, suspendValues)
 	if err != nil {
 		log.Printf("Error upgrading release %s: %v", rel.Name, err)
 		return err
