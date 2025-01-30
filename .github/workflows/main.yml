@@ -63,9 +63,11 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${GITHUB_REF#refs/tags/}"
             echo "TAG=${TAG}" >> $GITHUB_ENV
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
             echo "RELEASE_BUILD=true" >> $GITHUB_ENV
           else
             echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
             echo "RELEASE_BUILD=false" >> $GITHUB_ENV
           fi
           echo "Final image tag: ${TAG}"
@@ -78,5 +80,5 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-            ${{ env.RELEASE_BUILD == 'true' && format('{0}/{1}:latest', env.REGISTRY, env.IMAGE) || '' }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.set-tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
