@@ -19,11 +19,13 @@ on:
       - "go.sum"
       - "**/*.go"
       - ".github/workflows/main.yml"
+  release:
+    types:
+      - published
 
 env:
   REGISTRY: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker
   IMAGE: onyxia-janitor
-  TAG: ${{ github.sha }}
 
 jobs:
   docker:
@@ -55,6 +57,15 @@ jobs:
           username: "oauth2accesstoken"
           password: "${{ steps.auth.outputs.access_token }}"
 
+      - name: Determine Image Tag
+        id: set-tag
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+          fi
+
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v4
         with:
@@ -64,4 +75,4 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
+            ${{ github.ref_type == 'tag' && format('{0}:latest', env.REGISTRY) || '' }}
