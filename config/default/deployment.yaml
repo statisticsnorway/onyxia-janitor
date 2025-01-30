@@ -16,7 +16,7 @@ spec:
       serviceAccountName: onyxia-janitor-sa
       containers:
       - name: onyxia-janitor
-        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:v0.0.1
+        image: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker/onyxia-janitor:v0.0.2
         resources:
           requests:
             memory: "256Mi"
