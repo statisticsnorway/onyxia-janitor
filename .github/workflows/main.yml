@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - "main" 
+      - "main"
     paths:
       - "Dockerfile"
       - "go.mod"
@@ -60,11 +60,15 @@ jobs:
       - name: Determine Image Tag
         id: set-tag
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "TAG=${TAG}" >> $GITHUB_ENV
+            echo "RELEASE_BUILD=true" >> $GITHUB_ENV
           else
             echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+            echo "RELEASE_BUILD=false" >> $GITHUB_ENV
           fi
+          echo "Final image tag: ${TAG}"
 
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v4
@@ -75,4 +79,4 @@ jobs:
           push: true
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
-            ${{ github.ref_type == 'tag' && format('{0}:latest', env.REGISTRY) || '' }}
+            ${{ env.RELEASE_BUILD == 'true' && format('{0}/{1}:latest', env.REGISTRY, env.IMAGE) || '' }}
