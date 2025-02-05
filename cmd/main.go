@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"onyxia-janitor/pkg/notify"
 	"onyxia-janitor/pkg/suspend"
 	"onyxia-janitor/pkg/uninstall"
 
@@ -33,6 +34,7 @@ func main() {
 		"datadoc",
 	}
 
+	// Uninstall failed Helm releases every day at 20:00
 	gocron.Every(1).Day().At("20:00").Do(func() {
 		log.Println("Running 'Uninstall failed releases' job...")
 		if err := uninstall.UninstallFailedReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
@@ -42,6 +44,7 @@ func main() {
 		}
 	})
 
+	// Suspend running user services every day at 22:00
 	gocron.Every(1).Day().At("22:00").Do(func() {
 		log.Println("Running 'Suspend user services' job...")
 		if err := suspend.SuspendReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
@@ -51,11 +54,22 @@ func main() {
 		}
 	})
 
+	// Notify users about old Helm releases every Sunday at 08:00
+	gocron.Every(1).Week().Sunday().At("08:00").Do(func() {
+		log.Println("Running 'Notify users about old Helm releases' job...")
+		if err := notify.NotifyUsersAboutOldServices(k8sClient, settings, "user-ssb-"); err != nil {
+			log.Printf("Error during 'Notify users about old Helm releases' job: %v", err)
+		} else {
+			log.Println("'Notify users about old Helm releases' job completed successfully")
+		}
+	})
+
 	log.Println("All jobs scheduled. Waiting for the scheduled times to run...")
 	gocron.Start()
 	select {}
 }
 
+// initializeKubernetesClient initializes the Kubernetes client and Helm settings
 func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 	var config *rest.Config
 	var err error
