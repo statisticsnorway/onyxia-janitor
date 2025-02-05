@@ -3,7 +3,7 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - "main" 
+      - "main"
     paths:
       - "Dockerfile"
       - "go.mod"
@@ -19,11 +19,13 @@ on:
       - "go.sum"
       - "**/*.go"
       - ".github/workflows/main.yml"
+  release:
+    types:
+      - published
 
 env:
   REGISTRY: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker
   IMAGE: onyxia-janitor
-  TAG: ${{ github.sha }}
 
 jobs:
   docker:
@@ -55,6 +57,21 @@ jobs:
           username: "oauth2accesstoken"
           password: "${{ steps.auth.outputs.access_token }}"
 
+      - name: Determine Image Tag
+        id: set-tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            echo "TAG=${TAG}" >> $GITHUB_ENV
+            echo "tag=${TAG}" >> $GITHUB_OUTPUT
+            echo "RELEASE_BUILD=true" >> $GITHUB_ENV
+          else
+            echo "TAG=${{ github.sha }}" >> $GITHUB_ENV
+            echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "RELEASE_BUILD=false" >> $GITHUB_ENV
+          fi
+          echo "Final image tag: ${TAG}"
+
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v4
         with:
@@ -63,5 +80,5 @@ jobs:
           file: Dockerfile
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ env.TAG }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ steps.set-tag.outputs.tag }}
             ${{ env.REGISTRY }}/${{ env.IMAGE }}:latest
