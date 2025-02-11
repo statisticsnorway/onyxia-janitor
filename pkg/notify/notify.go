@@ -106,21 +106,30 @@ func sendEmailNotification(userEmail string, releases []string) error {
 
 	releaseList := ""
 	for _, release := range releases {
-		releaseList += fmt.Sprintf("- %s\n", release)
+		releaseList += fmt.Sprintf("<li>%s</li>", release)
 	}
+
+	emailBody := fmt.Sprintf(`
+		<html>
+			<body>
+				<p>Hei %s,</p>
+				<p>Det er mer enn 7 dager siden følgende tjenester ble startet for første gang:</p>
+				<ul>%s</ul>
+				<p>Vi anbefaler deg å slette tjenesten og starte en ny, slik at du jobber med en oppdatert versjon.</p>
+				<p>Husk å pushe kode til GitHub, og ta vare på andre filer som ligger i tjenestens filsystem, før du sletter.</p>
+				<p>Vennlig hilsen,<br>Dapla Lab Team</p>
+			</body>
+		</html>`,
+		strings.Split(userEmail, "@")[0],
+		releaseList,
+	)
 
 	emailPayload := map[string]interface{}{
 		"email": map[string]string{
-			"subject": subject,
-			"body": fmt.Sprintf(
-				"Hei %s,\n\nDet er mer enn 7 dager siden tjenesten %s ble startet for første gang.\n\n"+
-					"Vi anbefaler deg å slette tjenesten og starte en ny, slik at du jobber med en "+
-					"oppdatert versjon. Husk å pushe kode til GitHub, og ta vare på andre filer som "+
-					"ligger i tjenestens filsystem, før du sletter.\n",
-				strings.Split(userEmail, "@")[0],
-				releaseList,
-			),
-			"from_name": emailSender,
+			"subject":      subject,
+			"body":         emailBody,
+			"from_name":    emailSender,
+			"content_type": "text/html",
 		},
 	}
 
