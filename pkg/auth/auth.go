@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-const tokenURL = "https://auth.ssb.no/realms/ssb/protocol/openid-connect/token"
-
 var cachedToken string
 var tokenExpiry time.Time
 
@@ -25,18 +23,18 @@ func GetToken() (string, error) {
 		return cachedToken, nil
 	}
 
+	tokenURL := os.Getenv("ONYXIA_JANITOR_KEYCLOAK_URL")
 	clientID := os.Getenv("ONYXIA_JANITOR_CLIENT_ID")
 	clientSecret := os.Getenv("ONYXIA_JANITOR_CLIENT_SECRET")
 
-	if clientID == "" || clientSecret == "" {
-		log.Println("Keycloak client ID or secret is missing")
-		return "", fmt.Errorf("missing Keycloak credentials")
+	if tokenURL == "" || clientID == "" || clientSecret == "" {
+		log.Println("Keycloak configuration is missing required values")
+		return "", fmt.Errorf("missing Keycloak credentials or token URL")
 	}
 
-	data := []byte(fmt.Sprintf("grant_type=client_credentials&client_id=%s&client_secret=%s",
-		clientID, clientSecret))
+	data := fmt.Sprintf("grant_type=client_credentials&client_id=%s&client_secret=%s", clientID, clientSecret)
 
-	req, err := http.NewRequest("POST", tokenURL, bytes.NewBuffer(data))
+	req, err := http.NewRequest("POST", tokenURL, bytes.NewBufferString(data))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -62,6 +60,6 @@ func GetToken() (string, error) {
 	cachedToken = tokenResp.AccessToken
 	tokenExpiry = time.Now().Add(time.Duration(tokenResp.ExpiresIn-60) * time.Second)
 
-	log.Println("Successfully obtained Keycloak token")
+	log.Println("Successfully obtained Keycloak token from", tokenURL)
 	return cachedToken, nil
 }
