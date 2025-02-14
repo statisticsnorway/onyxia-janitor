@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -17,7 +18,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const emailAPIURL = "https://dapla-team-api.intern.ssb.no/users/%s/messages"
+var emailAPIURL = os.Getenv("ONYXIA_JANITOR_EMAIL_API_URL")
+
 const emailSender = "ikkesvar@ssb.no"
 const timeThreshold = 7 * 24 * time.Hour
 
@@ -97,6 +99,11 @@ func getOldHelmReleases(namespace string, helmSettings *cli.EnvSettings) ([]stri
 }
 
 func sendEmailNotification(userEmail string, releases []string) error {
+	if emailAPIURL == "" {
+		log.Println("Email API URL is missing")
+		return fmt.Errorf("missing email API URL (ONYXIA_JANITOR_EMAIL_API_URL)")
+	}
+
 	if len(userEmail) < 5 || !strings.Contains(userEmail, "@") {
 		log.Printf("Skipping email notification: Invalid email format %s", userEmail)
 		return nil
