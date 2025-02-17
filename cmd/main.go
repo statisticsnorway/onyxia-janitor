@@ -22,6 +22,11 @@ func main() {
 
 	log.Println("Current time:", time.Now())
 
+	tokenURL := os.Getenv("ONYXIA_JANITOR_KEYCLOAK_URL")
+	emailAPIURL := os.Getenv("ONYXIA_JANITOR_EMAIL_API_URL")
+	log.Println("Using Keycloak URL =", tokenURL)
+	log.Println("Using Email API URL at startup =", emailAPIURL)
+
 	k8sClient, settings := initializeKubernetesClient()
 
 	allowedCharts := []string{
