@@ -33,10 +33,14 @@ type notifierConfig struct {
 	TeamApiUrl   string `env:"TEAM_API_URL,required,notEmpty"`
 }
 
-func main() {
-	cfg, err := env.ParseAsWithOptions[config](env.Options{
+func parseConfig[T any]() (T, error) {
+	return env.ParseAsWithOptions[T](env.Options{
 		Prefix: "ONYXIA_JANITOR_",
 	})
+}
+
+func main() {
+	cfg, err := parseConfig[config]()
 	if err != nil {
 		log.Printf("error parsing environment variables: %s", err)
 		os.Exit(1)
@@ -71,9 +75,7 @@ func main() {
 	case "suspend":
 		{
 			log.Println("Running 'Suspend user services' job...")
-			suspendCfg, err := env.ParseAsWithOptions[suspendConfig](env.Options{
-				Prefix: "ONYXIA_JANITOR_",
-			})
+			suspendCfg, err := parseConfig[suspendConfig]()
 			if err != nil {
 				log.Printf("error parsing notifier environment variables: %s", err)
 				os.Exit(1)
@@ -88,9 +90,7 @@ func main() {
 	case "notify":
 		{
 			log.Println("Running 'Notify users about old Helm releases' job...")
-			notifyCfg, err := env.ParseAsWithOptions[notifierConfig](env.Options{
-				Prefix: "ONYXIA_JANITOR_",
-			})
+			notifyCfg, err := parseConfig[notifierConfig]()
 			if err != nil {
 				log.Printf("error parsing notifier environment variables: %s", err)
 				os.Exit(1)
