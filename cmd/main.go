@@ -7,6 +7,7 @@ import (
 
 	"onyxia-janitor/pkg/notify"
 	"onyxia-janitor/pkg/suspend"
+	"onyxia-janitor/pkg/teamapi"
 	"onyxia-janitor/pkg/uninstall"
 
 	"helm.sh/helm/v3/pkg/cli"
@@ -14,20 +15,40 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/caarlos0/env/v11"
 	"github.com/jasonlvhit/gocron"
 )
 
-const helmRepoURL = "https://statisticsnorway.github.io/dapla-lab-helm-charts-standard"
+type config struct {
+	HelmRepoUrl string `env:"HELM_REPO_URL,required,notEmpty"`
+}
+
+type notifierConfig struct {
+	TokenUrl     string `env:"TOKEN_URL,required,notEmpty"`
+	ClientId     string `env:"CLIENT_ID,required,notEmpty"`
+	ClientSecret string `env:"CLIENT_SECRET,required,notEmpty,unset"`
+	TeamApiUrl   string `env:"TEAM_API_URL,required,notEmpty"`
+}
 
 func main() {
+	cfg, err := env.ParseAsWithOptions[config](env.Options{
+		Prefix: "ONYXIA_JANITOR_",
+	})
+	if err != nil {
+		log.Printf("error parsing environment variables: %s", err)
+		os.Exit(1)
+	}
+
+	notifyCfg, err := env.ParseAsWithOptions[notifierConfig](env.Options{
+		Prefix: "ONYXIA_JANITOR_",
+	})
+	if err != nil {
+		log.Printf("error parsing notifier environment variables: %s", err)
+		os.Exit(1)
+	}
+
 	log.Println("Starting Helm janitor process...")
-
 	log.Println("Current time:", time.Now())
-
-	tokenURL := os.Getenv("ONYXIA_JANITOR_KEYCLOAK_URL")
-	emailAPIURL := os.Getenv("ONYXIA_JANITOR_EMAIL_API_URL")
-	log.Println("Using Keycloak URL =", tokenURL)
-	log.Println("Using Email API URL at startup =", emailAPIURL)
 
 	k8sClient, settings := initializeKubernetesClient()
 
@@ -55,7 +76,7 @@ func main() {
 	// Suspend running user services every day at 22:00
 	gocron.Every(1).Day().At("22:00").Do(func() {
 		log.Println("Running 'Suspend user services' job...")
-		suspender := suspend.New(k8sClient, settings, helmRepoURL)
+		suspender := suspend.New(k8sClient, settings, cfg.HelmRepoUrl)
 		if err := suspender.SuspendReleases(allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Suspend user services' job: %v", err)
 		} else {
@@ -66,7 +87,8 @@ func main() {
 	// Notify users about old Helm releases every Sunday at 08:00
 	gocron.Every(1).Week().Sunday().At("08:00").Do(func() {
 		log.Println("Running 'Notify users about old Helm releases' job...")
-		notifier := notify.New(k8sClient, settings, emailAPIURL)
+		teamApiClient := teamapi.NewClient(notifyCfg.TeamApiUrl, notifyCfg.TokenUrl, notifyCfg.ClientId, notifyCfg.ClientSecret)
+		notifier := notify.New(k8sClient, settings, teamApiClient)
 		if err := notifier.NotifyUsersAboutOldServices("user-ssb-"); err != nil {
 			log.Printf("Error during 'Notify users about old Helm releases' job: %v", err)
 		} else {

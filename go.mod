@@ -3,6 +3,9 @@ module onyxia-janitor
 go 1.23.4
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
+	github.com/jasonlvhit/gocron v0.0.1
+	golang.org/x/oauth2 v0.21.0
 	helm.sh/helm/v3 v3.12.2
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0
@@ -67,7 +70,6 @@ require (
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/imdario/mergo v0.3.16 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jasonlvhit/gocron v0.0.1 // indirect
 	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
@@ -118,7 +120,6 @@ require (
 	go.starlark.net v0.0.0-20230525235612-a134d8f9ddca // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/oauth2 v0.21.0 // indirect
 	golang.org/x/sync v0.10.0 // indirect
 	golang.org/x/sys v0.28.0 // indirect
 	golang.org/x/term v0.27.0 // indirect
