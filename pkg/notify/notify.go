@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -18,15 +17,52 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-var emailAPIURL = os.Getenv("ONYXIA_JANITOR_EMAIL_API_URL")
+// var emailAPIURL = os.Getenv("ONYXIA_JANITOR_EMAIL_API_URL")
 
-const emailSender = "ikkesvar@ssb.no"
-const timeThreshold = 7 * 24 * time.Hour
+type emailNotifier struct {
+	kubernetes *kubernetes.Clientset
+	settings   *cli.EnvSettings
 
-func NotifyUsersAboutOldServices(clientset *kubernetes.Clientset, helmSettings *cli.EnvSettings, prefix string) error {
+	emailApiUrl   string
+	senderEmail   string
+	timeThreshold time.Duration
+}
+
+type optFunc func(*emailNotifier)
+
+func WithSenderEmail(email string) optFunc {
+	return func(n *emailNotifier) {
+		n.senderEmail = email
+	}
+}
+
+func WithTimeThreshold(threshold time.Duration) optFunc {
+	return func(n *emailNotifier) {
+		n.timeThreshold = threshold
+	}
+}
+
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, emailApiUrl string, opts ...optFunc) *emailNotifier {
+	notifier := &emailNotifier{
+		kubernetes: client,
+		settings:   settings,
+
+		emailApiUrl:   emailApiUrl,
+		senderEmail:   "ikkesvar@ssb.no",
+		timeThreshold: 7 * 24 * time.Hour,
+	}
+
+	for _, f := range opts {
+		f(notifier)
+	}
+
+	return notifier
+}
+
+func (n *emailNotifier) NotifyUsersAboutOldServices(prefix string) error {
 	log.Println("Checking for old Helm releases in user namespaces...")
 
-	namespaces, err := common.GetNamespacesWithPrefix(clientset, prefix)
+	namespaces, err := common.GetNamespacesWithPrefix(n.kubernetes, prefix)
 	if err != nil {
 		return fmt.Errorf("error retrieving namespaces: %w", err)
 	}
@@ -38,14 +74,14 @@ func NotifyUsersAboutOldServices(clientset *kubernetes.Clientset, helmSettings *
 			continue
 		}
 
-		oldReleases, err := getOldHelmReleases(namespace, helmSettings)
+		oldReleases, err := n.getOldHelmReleases(namespace)
 		if err != nil {
 			log.Printf("Error checking Helm releases in namespace %s: %v", namespace, err)
 			continue
 		}
 
 		if len(oldReleases) > 0 {
-			err = sendEmailNotification(userEmail, oldReleases)
+			err = n.sendEmailNotification(userEmail, oldReleases)
 			if err != nil {
 				log.Printf("Error sending email to %s: %v", userEmail, err)
 			} else {
@@ -69,11 +105,11 @@ func getUserEmailFromNamespace(namespace string) string {
 	return ""
 }
 
-func getOldHelmReleases(namespace string, helmSettings *cli.EnvSettings) ([]string, error) {
+func (n *emailNotifier) getOldHelmReleases(namespace string) ([]string, error) {
 	actionConfig := new(action.Configuration)
-	helmSettings.SetNamespace(namespace)
+	n.settings.SetNamespace(namespace)
 
-	if err := actionConfig.Init(helmSettings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
+	if err := actionConfig.Init(n.settings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
 		return nil, fmt.Errorf("error initializing Helm action config: %w", err)
 	}
 
@@ -90,7 +126,7 @@ func getOldHelmReleases(namespace string, helmSettings *cli.EnvSettings) ([]stri
 	now := time.Now()
 
 	for _, rel := range releases {
-		if now.Sub(rel.Info.FirstDeployed.Time) > timeThreshold {
+		if now.Sub(rel.Info.FirstDeployed.Time) > n.timeThreshold {
 			oldReleases = append(oldReleases, rel.Name)
 		}
 	}
@@ -98,8 +134,8 @@ func getOldHelmReleases(namespace string, helmSettings *cli.EnvSettings) ([]stri
 	return oldReleases, nil
 }
 
-func sendEmailNotification(userEmail string, releases []string) error {
-	if emailAPIURL == "" {
+func (n *emailNotifier) sendEmailNotification(userEmail string, releases []string) error {
+	if n.emailApiUrl == "" {
 		log.Println("Email API URL is missing")
 		return fmt.Errorf("missing email API URL (ONYXIA_JANITOR_EMAIL_API_URL)")
 	}
@@ -135,7 +171,7 @@ func sendEmailNotification(userEmail string, releases []string) error {
 		"email": map[string]string{
 			"subject":      subject,
 			"body":         emailBody,
-			"from_name":    emailSender,
+			"from_name":    n.senderEmail,
 			"content_type": "text/html",
 		},
 	}
@@ -151,7 +187,7 @@ func sendEmailNotification(userEmail string, releases []string) error {
 		return err
 	}
 
-	url := fmt.Sprintf(emailAPIURL, userEmail)
+	url := fmt.Sprintf(n.emailApiUrl, userEmail)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)

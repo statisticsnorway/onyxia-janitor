@@ -11,8 +11,20 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func UninstallFailedReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSettings, allowedCharts []string, prefix string) error {
-	namespaces, err := common.GetNamespacesWithPrefix(clientset, prefix)
+type serviceUninstaller struct {
+	kubernetes *kubernetes.Clientset
+	settings   *cli.EnvSettings
+}
+
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *serviceUninstaller {
+	return &serviceUninstaller{
+		kubernetes: client,
+		settings:   settings,
+	}
+}
+
+func (u *serviceUninstaller) UninstallFailedReleases(allowedCharts []string, prefix string) error {
+	namespaces, err := common.GetNamespacesWithPrefix(u.kubernetes, prefix)
 	if err != nil {
 		return err
 	}
@@ -22,7 +34,7 @@ func UninstallFailedReleases(clientset *kubernetes.Clientset, helmSettings *cli.
 
 		os.Setenv("KUBERNETES_NAMESPACE", namespace) // Ensure namespace context is set
 		actionConfig := new(action.Configuration)
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
+		if err := actionConfig.Init(u.settings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
 			log.Printf("Error initializing Helm action configuration for namespace %s: %v", namespace, err)
 			continue
 		}
