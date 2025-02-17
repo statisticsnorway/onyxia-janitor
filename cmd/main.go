@@ -19,8 +19,11 @@ import (
 )
 
 type config struct {
+	Action string `env:"ACTION,required,notEmpty"`
+}
+
+type suspendConfig struct {
 	HelmRepoUrl string `env:"HELM_REPO_URL,required,notEmpty"`
-	Action      string `env:"ACTION,required,notEmpty"`
 }
 
 type notifierConfig struct {
@@ -36,14 +39,6 @@ func main() {
 	})
 	if err != nil {
 		log.Printf("error parsing environment variables: %s", err)
-		os.Exit(1)
-	}
-
-	notifyCfg, err := env.ParseAsWithOptions[notifierConfig](env.Options{
-		Prefix: "ONYXIA_JANITOR_",
-	})
-	if err != nil {
-		log.Printf("error parsing notifier environment variables: %s", err)
 		os.Exit(1)
 	}
 
@@ -76,7 +71,14 @@ func main() {
 	case "suspend":
 		{
 			log.Println("Running 'Suspend user services' job...")
-			suspender := suspend.New(k8sClient, settings, cfg.HelmRepoUrl)
+			suspendCfg, err := env.ParseAsWithOptions[suspendConfig](env.Options{
+				Prefix: "ONYXIA_JANITOR_",
+			})
+			if err != nil {
+				log.Printf("error parsing notifier environment variables: %s", err)
+				os.Exit(1)
+			}
+			suspender := suspend.New(k8sClient, settings, suspendCfg.HelmRepoUrl)
 			if err := suspender.SuspendReleases(allowedCharts, "user-ssb-"); err != nil {
 				log.Printf("Error during 'Suspend user services' job: %v", err)
 			} else {
@@ -86,6 +88,13 @@ func main() {
 	case "notify":
 		{
 			log.Println("Running 'Notify users about old Helm releases' job...")
+			notifyCfg, err := env.ParseAsWithOptions[notifierConfig](env.Options{
+				Prefix: "ONYXIA_JANITOR_",
+			})
+			if err != nil {
+				log.Printf("error parsing notifier environment variables: %s", err)
+				os.Exit(1)
+			}
 			teamApiClient := teamapi.NewClient(notifyCfg.TeamApiUrl, notifyCfg.TokenUrl, notifyCfg.ClientId, notifyCfg.ClientSecret)
 			notifier := notify.New(k8sClient, settings, teamApiClient)
 			if err := notifier.NotifyUsersAboutOldServices("user-ssb-"); err != nil {
