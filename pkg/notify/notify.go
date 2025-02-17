@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,12 +18,11 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-// var emailAPIURL = os.Getenv("ONYXIA_JANITOR_EMAIL_API_URL")
+var serviceNameRegex = regexp.MustCompile(`^([a-zA-Z-]+)`)
 
 type emailNotifier struct {
-	kubernetes *kubernetes.Clientset
-	settings   *cli.EnvSettings
-
+	kubernetes    *kubernetes.Clientset
+	settings      *cli.EnvSettings
 	emailApiUrl   string
 	senderEmail   string
 	timeThreshold time.Duration
@@ -44,9 +44,8 @@ func WithTimeThreshold(threshold time.Duration) optFunc {
 
 func New(client *kubernetes.Clientset, settings *cli.EnvSettings, emailApiUrl string, opts ...optFunc) *emailNotifier {
 	notifier := &emailNotifier{
-		kubernetes: client,
-		settings:   settings,
-
+		kubernetes:    client,
+		settings:      settings,
 		emailApiUrl:   emailApiUrl,
 		senderEmail:   "ikkesvar@ssb.no",
 		timeThreshold: 7 * 24 * time.Hour,
@@ -134,6 +133,14 @@ func (n *emailNotifier) getOldHelmReleases(namespace string) ([]string, error) {
 	return oldReleases, nil
 }
 
+func cleanServiceName(service string) string {
+	matches := serviceNameRegex.FindStringSubmatch(service)
+	if len(matches) > 1 {
+		return strings.TrimSuffix(matches[1], "-")
+	}
+	return service
+}
+
 func (n *emailNotifier) sendEmailNotification(userEmail string, releases []string) error {
 	if n.emailApiUrl == "" {
 		log.Println("Email API URL is missing")
@@ -145,38 +152,40 @@ func (n *emailNotifier) sendEmailNotification(userEmail string, releases []strin
 		return nil
 	}
 
-	subject := fmt.Sprintf("Dapla Lab: Tjenesten %s har levd i over 7 dager.", releases[0])
+	subject := "Dapla Lab: Du har tjenester som ble startet for mer enn 7 dager siden"
 
-	releaseList := ""
+	releaseTable := "<table border='1' style='border-collapse: collapse;'><tr><th>Tjeneste</th></tr>"
 	for _, release := range releases {
-		releaseList += fmt.Sprintf("<li>%s</li>", release)
+		releaseTable += fmt.Sprintf("<tr><td>%s</td></tr>", cleanServiceName(release))
 	}
+	releaseTable += "</table>"
 
 	emailBody := fmt.Sprintf(`
 		<html>
 			<body>
 				<p>Hei %s,</p>
-				<p>Det er mer enn 7 dager siden følgende tjenester ble startet for første gang:</p>
-				<ul>%s</ul>
-				<p>Vi anbefaler deg å slette tjenesten og starte en ny, slik at du jobber med en oppdatert versjon.</p>
+				<p>Du har en eller flere tjenester (se tabell under) som ble startet for mer enn 7 dager siden.</p>
+				<p>Vi anbefaler deg å slette tjenester som ble startet for mer enn 7 dager siden slik at du jobber på siste versjon av tjenesten.</p>
+
+				%s <!-- Table of services -->
+
 				<p>Husk å pushe kode til GitHub, og ta vare på andre filer som ligger i tjenestens filsystem, før du sletter.</p>
+
 				<p>Vennlig hilsen,<br>Dapla Lab Team</p>
 			</body>
 		</html>`,
 		strings.Split(userEmail, "@")[0],
-		releaseList,
+		releaseTable,
 	)
 
-	emailPayload := map[string]interface{}{
-		"email": map[string]string{
-			"subject":      subject,
-			"body":         emailBody,
-			"from_name":    n.senderEmail,
-			"content_type": "text/html",
-		},
+	emailPayload := map[string]string{
+		"subject":      subject,
+		"body":         emailBody,
+		"from_name":    n.senderEmail,
+		"content_type": "text/html",
 	}
 
-	payloadBytes, err := json.Marshal(emailPayload)
+	payloadBytes, err := json.Marshal(map[string]interface{}{"email": emailPayload})
 	if err != nil {
 		return fmt.Errorf("error encoding email payload: %w", err)
 	}
