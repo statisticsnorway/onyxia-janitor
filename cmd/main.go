@@ -17,6 +17,8 @@ import (
 	"github.com/jasonlvhit/gocron"
 )
 
+const helmRepoURL = "https://statisticsnorway.github.io/dapla-lab-helm-charts-standard"
+
 func main() {
 	log.Println("Starting Helm janitor process...")
 
@@ -42,7 +44,8 @@ func main() {
 	// Uninstall failed Helm releases every day at 20:00
 	gocron.Every(1).Day().At("20:00").Do(func() {
 		log.Println("Running 'Uninstall failed releases' job...")
-		if err := uninstall.UninstallFailedReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
+		uninstaller := uninstall.New(k8sClient, settings)
+		if err := uninstaller.UninstallFailedReleases(allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Uninstall failed releases' job: %v", err)
 		} else {
 			log.Println("'Uninstall failed releases' job completed successfully")
@@ -52,7 +55,8 @@ func main() {
 	// Suspend running user services every day at 22:00
 	gocron.Every(1).Day().At("22:00").Do(func() {
 		log.Println("Running 'Suspend user services' job...")
-		if err := suspend.SuspendReleases(k8sClient, settings, allowedCharts, "user-ssb-"); err != nil {
+		suspender := suspend.New(k8sClient, settings, helmRepoURL)
+		if err := suspender.SuspendReleases(allowedCharts, "user-ssb-"); err != nil {
 			log.Printf("Error during 'Suspend user services' job: %v", err)
 		} else {
 			log.Println("'Suspend user services' job completed successfully")
@@ -62,7 +66,8 @@ func main() {
 	// Notify users about old Helm releases every Sunday at 08:00
 	gocron.Every(1).Week().Sunday().At("08:00").Do(func() {
 		log.Println("Running 'Notify users about old Helm releases' job...")
-		if err := notify.NotifyUsersAboutOldServices(k8sClient, settings, "user-ssb-"); err != nil {
+		notifier := notify.New(k8sClient, settings, emailAPIURL)
+		if err := notifier.NotifyUsersAboutOldServices("user-ssb-"); err != nil {
 			log.Printf("Error during 'Notify users about old Helm releases' job: %v", err)
 		} else {
 			log.Println("'Notify users about old Helm releases' job completed successfully")

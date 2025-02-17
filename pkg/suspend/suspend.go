@@ -12,10 +12,22 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const helmRepoURL = "https://statisticsnorway.github.io/dapla-lab-helm-charts-standard"
+type serviceSuspender struct {
+	helmRepoUrl  string
+	kubernetes   *kubernetes.Clientset
+	helmSettings *cli.EnvSettings
+}
 
-func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSettings, allowedCharts []string, prefix string) error {
-	namespaces, err := common.GetNamespacesWithPrefix(clientset, prefix)
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, helmRepoUrl string) *serviceSuspender {
+	return &serviceSuspender{
+		kubernetes:   client,
+		helmSettings: settings,
+		helmRepoUrl:  helmRepoUrl,
+	}
+}
+
+func (s *serviceSuspender) SuspendReleases(allowedCharts []string, prefix string) error {
+	namespaces, err := common.GetNamespacesWithPrefix(s.kubernetes, prefix)
 	if err != nil {
 		return err
 	}
@@ -24,13 +36,13 @@ func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSetti
 		log.Printf("Processing namespace: %s", namespace)
 
 		actionConfig := new(action.Configuration)
-		helmSettings.SetNamespace(namespace)
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
+		s.helmSettings.SetNamespace(namespace)
+		if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
 			log.Printf("Error initializing Helm action configuration for namespace %s: %v", namespace, err)
 			continue
 		}
 
-		if err := processReleases(actionConfig, namespace, allowedCharts); err != nil {
+		if err := s.processReleases(actionConfig, namespace, allowedCharts); err != nil {
 			log.Printf("Error suspending releases in namespace %s: %v", namespace, err)
 		}
 	}
@@ -38,7 +50,7 @@ func SuspendReleases(clientset *kubernetes.Clientset, helmSettings *cli.EnvSetti
 	return nil
 }
 
-func processReleases(actionConfig *action.Configuration, namespace string, allowedCharts []string) error {
+func (s *serviceSuspender) processReleases(actionConfig *action.Configuration, namespace string, allowedCharts []string) error {
 	listAction := action.NewList(actionConfig)
 	listAction.AllNamespaces = false
 
@@ -55,14 +67,14 @@ func processReleases(actionConfig *action.Configuration, namespace string, allow
 			continue
 		}
 
-		if err := suspendRelease(actionConfig, rel); err != nil {
+		if err := s.suspendRelease(actionConfig, rel); err != nil {
 			log.Printf("Error suspending release %s in namespace %s: %v", rel.Name, namespace, err)
 		}
 	}
 	return nil
 }
 
-func suspendRelease(actionConfig *action.Configuration, rel *release.Release) error {
+func (s *serviceSuspender) suspendRelease(actionConfig *action.Configuration, rel *release.Release) error {
 	log.Printf("Attempting to suspend release %s (chart: %s) in namespace %s", rel.Name, rel.Chart.Metadata.Name, rel.Namespace)
 
 	os.Setenv("KUBERNETES_NAMESPACE", rel.Namespace)
@@ -74,7 +86,7 @@ func suspendRelease(actionConfig *action.Configuration, rel *release.Release) er
 	}
 
 	chartPathOptions := action.ChartPathOptions{
-		RepoURL: helmRepoURL,
+		RepoURL: s.helmRepoUrl,
 		Version: rel.Chart.Metadata.Version,
 	}
 	chartPath, err := chartPathOptions.LocateChart(rel.Chart.Metadata.Name, cli.New())
