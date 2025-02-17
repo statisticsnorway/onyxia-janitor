@@ -1,17 +1,13 @@
 package notify
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"regexp"
 	"strings"
 	"time"
 
 	"onyxia-janitor/common"
-	"onyxia-janitor/pkg/auth"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
@@ -21,20 +17,19 @@ import (
 var serviceNameRegex = regexp.MustCompile(`^([a-zA-Z-]+)`)
 
 type emailNotifier struct {
-	kubernetes    *kubernetes.Clientset
-	settings      *cli.EnvSettings
-	emailApiUrl   string
-	senderEmail   string
+	kubernetes *kubernetes.Clientset
+	settings   *cli.EnvSettings
+
 	timeThreshold time.Duration
+
+	emailSender EmailSender
+}
+
+type EmailSender interface {
+	SendEmail(user, subject, body string) error
 }
 
 type optFunc func(*emailNotifier)
-
-func WithSenderEmail(email string) optFunc {
-	return func(n *emailNotifier) {
-		n.senderEmail = email
-	}
-}
 
 func WithTimeThreshold(threshold time.Duration) optFunc {
 	return func(n *emailNotifier) {
@@ -42,12 +37,12 @@ func WithTimeThreshold(threshold time.Duration) optFunc {
 	}
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, emailApiUrl string, opts ...optFunc) *emailNotifier {
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, sender EmailSender, opts ...optFunc) *emailNotifier {
 	notifier := &emailNotifier{
-		kubernetes:    client,
-		settings:      settings,
-		emailApiUrl:   emailApiUrl,
-		senderEmail:   "ikkesvar@ssb.no",
+		kubernetes: client,
+		settings:   settings,
+
+		emailSender:   sender,
 		timeThreshold: 7 * 24 * time.Hour,
 	}
 
@@ -142,11 +137,6 @@ func cleanServiceName(service string) string {
 }
 
 func (n *emailNotifier) sendEmailNotification(userEmail string, releases []string) error {
-	if n.emailApiUrl == "" {
-		log.Println("Email API URL is missing")
-		return fmt.Errorf("missing email API URL (ONYXIA_JANITOR_EMAIL_API_URL)")
-	}
-
 	if len(userEmail) < 5 || !strings.Contains(userEmail, "@") {
 		log.Printf("Skipping email notification: Invalid email format %s", userEmail)
 		return nil
@@ -178,49 +168,11 @@ func (n *emailNotifier) sendEmailNotification(userEmail string, releases []strin
 		releaseTable,
 	)
 
-	emailPayload := map[string]string{
-		"subject":      subject,
-		"body":         emailBody,
-		"from_name":    n.senderEmail,
-		"content_type": "text/html",
-	}
-
-	payloadBytes, err := json.Marshal(map[string]interface{}{"email": emailPayload})
-	if err != nil {
-		return fmt.Errorf("error encoding email payload: %w", err)
-	}
-
-	token, err := auth.GetToken()
-	if err != nil {
-		log.Printf("Failed to obtain Keycloak token: %v", err)
+	if err := n.emailSender.SendEmail(userEmail, subject, emailBody); err != nil {
+		log.Printf("failed to send notification to %q: %s", userEmail, err)
 		return err
 	}
 
-	url := fmt.Sprintf(n.emailApiUrl, userEmail)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		return fmt.Errorf("error creating request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("error sending request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 404 {
-		log.Printf("Skipping email for %s: User not found (404)", userEmail)
-		return nil
-	}
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("email API returned status: %d", resp.StatusCode)
-	}
-
-	log.Printf("Email notification successfully sent to %s", userEmail)
+	log.Printf("successfully sent notification email to %q", userEmail)
 	return nil
 }
