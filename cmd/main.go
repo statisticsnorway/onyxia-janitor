@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"time"
 
 	"onyxia-janitor/pkg/notify"
 	"onyxia-janitor/pkg/suspend"
@@ -47,7 +46,6 @@ func main() {
 	}
 
 	log.Println("Starting Helm janitor process...")
-	log.Println("Current time:", time.Now())
 
 	k8sClient, settings := initializeKubernetesClient()
 
