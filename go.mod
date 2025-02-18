@@ -4,7 +4,6 @@ go 1.23.4
 
 require (
 	github.com/caarlos0/env/v11 v11.3.1
-	github.com/jasonlvhit/gocron v0.0.1
 	golang.org/x/oauth2 v0.21.0
 	helm.sh/helm/v3 v3.12.2
 	k8s.io/apimachinery v0.31.0

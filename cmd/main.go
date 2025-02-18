@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"time"
 
 	"onyxia-janitor/pkg/notify"
 	"onyxia-janitor/pkg/suspend"
@@ -16,10 +15,13 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/caarlos0/env/v11"
-	"github.com/jasonlvhit/gocron"
 )
 
 type config struct {
+	Action string `env:"ACTION,required,notEmpty"`
+}
+
+type suspendConfig struct {
 	HelmRepoUrl string `env:"HELM_REPO_URL,required,notEmpty"`
 }
 
@@ -30,25 +32,20 @@ type notifierConfig struct {
 	TeamApiUrl   string `env:"TEAM_API_URL,required,notEmpty"`
 }
 
-func main() {
-	cfg, err := env.ParseAsWithOptions[config](env.Options{
+func parseConfig[T any]() (T, error) {
+	return env.ParseAsWithOptions[T](env.Options{
 		Prefix: "ONYXIA_JANITOR_",
 	})
+}
+
+func main() {
+	cfg, err := parseConfig[config]()
 	if err != nil {
 		log.Printf("error parsing environment variables: %s", err)
 		os.Exit(1)
 	}
 
-	notifyCfg, err := env.ParseAsWithOptions[notifierConfig](env.Options{
-		Prefix: "ONYXIA_JANITOR_",
-	})
-	if err != nil {
-		log.Printf("error parsing notifier environment variables: %s", err)
-		os.Exit(1)
-	}
-
 	log.Println("Starting Helm janitor process...")
-	log.Println("Current time:", time.Now())
 
 	k8sClient, settings := initializeKubernetesClient()
 
@@ -62,43 +59,52 @@ func main() {
 		"datadoc",
 	}
 
-	// Uninstall failed Helm releases every day at 20:00
-	gocron.Every(1).Day().At("20:00").Do(func() {
-		log.Println("Running 'Uninstall failed releases' job...")
-		uninstaller := uninstall.New(k8sClient, settings)
-		if err := uninstaller.UninstallFailedReleases(allowedCharts, "user-ssb-"); err != nil {
-			log.Printf("Error during 'Uninstall failed releases' job: %v", err)
-		} else {
-			log.Println("'Uninstall failed releases' job completed successfully")
+	switch cfg.Action {
+	case "uninstall":
+		{
+			log.Println("Running 'Uninstall failed releases' job...")
+			uninstaller := uninstall.New(k8sClient, settings)
+			if err := uninstaller.UninstallFailedReleases(allowedCharts, "user-ssb-"); err != nil {
+				log.Printf("Error during 'Uninstall failed releases' job: %v", err)
+			} else {
+				log.Println("'Uninstall failed releases' job completed successfully")
+			}
 		}
-	})
-
-	// Suspend running user services every day at 22:00
-	gocron.Every(1).Day().At("22:00").Do(func() {
-		log.Println("Running 'Suspend user services' job...")
-		suspender := suspend.New(k8sClient, settings, cfg.HelmRepoUrl)
-		if err := suspender.SuspendReleases(allowedCharts, "user-ssb-"); err != nil {
-			log.Printf("Error during 'Suspend user services' job: %v", err)
-		} else {
-			log.Println("'Suspend user services' job completed successfully")
+	case "suspend":
+		{
+			log.Println("Running 'Suspend user services' job...")
+			suspendCfg, err := parseConfig[suspendConfig]()
+			if err != nil {
+				log.Printf("error parsing notifier environment variables: %s", err)
+				os.Exit(1)
+			}
+			suspender := suspend.New(k8sClient, settings, suspendCfg.HelmRepoUrl)
+			if err := suspender.SuspendReleases(allowedCharts, "user-ssb-"); err != nil {
+				log.Printf("Error during 'Suspend user services' job: %v", err)
+			} else {
+				log.Println("'Suspend user services' job completed successfully")
+			}
 		}
-	})
-
-	// Notify users about old Helm releases every Sunday at 08:00
-	gocron.Every(1).Week().Sunday().At("08:00").Do(func() {
-		log.Println("Running 'Notify users about old Helm releases' job...")
-		teamApiClient := teamapi.NewClient(notifyCfg.TeamApiUrl, notifyCfg.TokenUrl, notifyCfg.ClientId, notifyCfg.ClientSecret)
-		notifier := notify.New(k8sClient, settings, teamApiClient)
-		if err := notifier.NotifyUsersAboutOldServices("user-ssb-"); err != nil {
-			log.Printf("Error during 'Notify users about old Helm releases' job: %v", err)
-		} else {
-			log.Println("'Notify users about old Helm releases' job completed successfully")
+	case "notify":
+		{
+			log.Println("Running 'Notify users about old Helm releases' job...")
+			notifyCfg, err := parseConfig[notifierConfig]()
+			if err != nil {
+				log.Printf("error parsing notifier environment variables: %s", err)
+				os.Exit(1)
+			}
+			teamApiClient := teamapi.NewClient(notifyCfg.TeamApiUrl, notifyCfg.TokenUrl, notifyCfg.ClientId, notifyCfg.ClientSecret)
+			notifier := notify.New(k8sClient, settings, teamApiClient)
+			if err := notifier.NotifyUsersAboutOldServices("user-ssb-"); err != nil {
+				log.Printf("Error during 'Notify users about old Helm releases' job: %v", err)
+			} else {
+				log.Println("'Notify users about old Helm releases' job completed successfully")
+			}
 		}
-	})
-
-	log.Println("All jobs scheduled. Waiting for the scheduled times to run...")
-	gocron.Start()
-	select {}
+	default:
+		log.Printf("unknown action %q, must be one of: [uninstall, suspend, notify]", cfg.Action)
+		os.Exit(1)
+	}
 }
 
 // initializeKubernetesClient initializes the Kubernetes client and Helm settings
