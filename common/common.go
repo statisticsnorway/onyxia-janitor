@@ -15,9 +15,21 @@ func GetNamespacesWithPrefix(clientset *kubernetes.Clientset, prefix string) ([]
 	}
 
 	var matchedNamespaces []string
-	for _, ns := range namespaces.Items {
-		if strings.HasPrefix(ns.Name, prefix) {
-			matchedNamespaces = append(matchedNamespaces, ns.Name)
+
+	for {
+		for _, ns := range namespaces.Items {
+			if strings.HasPrefix(ns.Name, prefix) {
+				matchedNamespaces = append(matchedNamespaces, ns.Name)
+			}
+		}
+		if namespaces.Continue == "" {
+			break
+		}
+
+		// Fetch more if Kubernetes returned a Continue token on last list
+		namespaces, err = clientset.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{Continue: namespaces.Continue})
+		if err != nil {
+			return nil, err
 		}
 	}
 	return matchedNamespaces, nil
