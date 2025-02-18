@@ -18,11 +18,17 @@ import (
 )
 
 type config struct {
-	Action string `env:"ACTION,required,notEmpty"`
+	Action          string `env:"ACTION,required,notEmpty"`
+	NamespacePrefix string `env:"NAMESPACE_PREFIX" envDefault:"user-ssb-"`
 }
 
 type suspendConfig struct {
-	HelmRepoUrl string `env:"HELM_REPO_URL,required,notEmpty"`
+	AllowedCharts []string `env:"ALLOWED_CHARTS,required,notEmpty"`
+	HelmRepoUrl   string   `env:"HELM_REPO_URL,required,notEmpty"`
+}
+
+type uninstallConfig struct {
+	AllowedCharts []string `env:"ALLOWED_CHARTS,required,notEmpty"`
 }
 
 type notifierConfig struct {
@@ -49,22 +55,17 @@ func main() {
 
 	k8sClient, settings := initializeKubernetesClient()
 
-	allowedCharts := []string{
-		"vscode-python",
-		"rstudio",
-		"jupyter",
-		"jupyter-playground",
-		"jdemetra",
-		"jupyter-pyspark",
-		"datadoc",
-	}
-
 	switch cfg.Action {
 	case "uninstall":
 		{
 			log.Println("Running 'Uninstall failed releases' job...")
+			uninstallCfg, err := parseConfig[uninstallConfig]()
+			if err != nil {
+				log.Printf("error parsing notifier environment variables: %s", err)
+				os.Exit(1)
+			}
 			uninstaller := uninstall.New(k8sClient, settings)
-			if err := uninstaller.UninstallFailedReleases(allowedCharts, "user-ssb-"); err != nil {
+			if err := uninstaller.UninstallFailedReleases(uninstallCfg.AllowedCharts, cfg.NamespacePrefix); err != nil {
 				log.Printf("Error during 'Uninstall failed releases' job: %v", err)
 			} else {
 				log.Println("'Uninstall failed releases' job completed successfully")
@@ -79,7 +80,7 @@ func main() {
 				os.Exit(1)
 			}
 			suspender := suspend.New(k8sClient, settings, suspendCfg.HelmRepoUrl)
-			if err := suspender.SuspendReleases(allowedCharts, "user-ssb-"); err != nil {
+			if err := suspender.SuspendReleases(suspendCfg.AllowedCharts, cfg.NamespacePrefix); err != nil {
 				log.Printf("Error during 'Suspend user services' job: %v", err)
 			} else {
 				log.Println("'Suspend user services' job completed successfully")
@@ -95,7 +96,7 @@ func main() {
 			}
 			teamApiClient := teamapi.NewClient(notifyCfg.TeamApiUrl, notifyCfg.TokenUrl, notifyCfg.ClientId, notifyCfg.ClientSecret)
 			notifier := notify.New(k8sClient, settings, teamApiClient)
-			if err := notifier.NotifyUsersAboutOldServices("user-ssb-"); err != nil {
+			if err := notifier.NotifyUsersAboutOldServices(cfg.NamespacePrefix); err != nil {
 				log.Printf("Error during 'Notify users about old Helm releases' job: %v", err)
 			} else {
 				log.Println("'Notify users about old Helm releases' job completed successfully")
