@@ -4,10 +4,10 @@ import (
 	"log"
 	"os"
 
-	"onyxia-janitor/pkg/notify"
-	"onyxia-janitor/pkg/suspend"
+	"onyxia-janitor/pkg/action/notify"
+	"onyxia-janitor/pkg/action/suspend"
+	"onyxia-janitor/pkg/action/uninstall"
 	"onyxia-janitor/pkg/teamapi"
-	"onyxia-janitor/pkg/uninstall"
 
 	"helm.sh/helm/v3/pkg/cli"
 	"k8s.io/client-go/kubernetes"
