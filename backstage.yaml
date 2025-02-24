@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: onyxia-janitor
+  title: Onyxia Janitor
+  description: |
+    Application for managing services deployed by users in Dapla Lab/Onyxia
+  tags:
+    - dapla
+  annotations:
+    github.com/project-slug: statisticsnorway/onyxia-janitor
+spec:
+  type: service
+  owner: dapla-skyinfra-developers
+  lifecycle: production
