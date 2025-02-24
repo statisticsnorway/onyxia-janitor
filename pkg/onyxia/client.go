@@ -8,7 +8,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 )
 
 const onyxiaSecretType = "onyxia.sh/release.v1"
@@ -17,27 +16,31 @@ const secretCatalogKey = "catalog"
 const secretFriendlyNameKey = "friendlyName"
 
 type client struct {
-	secrets corev1typed.SecretsGetter
+	lister SecretLister
+}
+
+type SecretLister interface {
+	List(context.Context, v1.ListOptions) (*corev1.SecretList, error)
 }
 
 type Service struct {
+	Name         string
+	Namespace    string
 	Catalog      string
 	FriendlyName string
-	Name         string
 }
 
-func New(secrets corev1typed.SecretsGetter) *client {
+func New(lister SecretLister) *client {
 	return &client{
-		secrets: secrets,
+		lister: lister,
 	}
 }
 
-func (c *client) List(ctx context.Context, namespace string) ([]Service, error) {
-	nsSecrets := c.secrets.Secrets(namespace)
+func (c *client) List(ctx context.Context) ([]Service, error) {
 	var services []Service
 	cont := ""
 	for {
-		secrets, err := nsSecrets.List(ctx, v1.ListOptions{
+		secrets, err := c.lister.List(ctx, v1.ListOptions{
 			Continue:      cont,
 			FieldSelector: fmt.Sprintf("type=%s", onyxiaSecretType),
 		})
@@ -75,6 +78,7 @@ func parseServiceSecret(secret corev1.Secret) (Service, error) {
 
 	return Service{
 		Name:         name,
+		Namespace:    secret.Namespace,
 		FriendlyName: string(friendlyName),
 		Catalog:      string(catalog),
 	}, nil

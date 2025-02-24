@@ -3,23 +3,26 @@ package main
 import (
 	"context"
 	"log"
-	nsgetter "onyxia-janitor/pkg/namespaces"
+	"log/slog"
 	"onyxia-janitor/pkg/onyxia"
 	"os"
 
+	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"helm.sh/helm/v3/pkg/release"
 	"k8s.io/client-go/kubernetes"
-	corev1typed "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/caarlos0/env/v11"
-
-	corev1 "k8s.io/api/core/v1"
+	"github.com/expr-lang/expr"
 )
 
-const namespaceFilter = `Name startsWith "user-ssb-tni"`
+// const helmValuesFilter = ` global?.suspend ?? true`
+const onyxiaMetadataFilter = `Namespace startsWith "user-ssb-"`
+
+// const helmMetadataFilter = `true`
+const helmReleaseFilter = `(not Config.global?.suspend ?? true) and (now().Sub(Info?.FirstDeployed.Time ?? now()) > duration(string(7 * 24) + "h"))`
 
 var catalogs map[string]string = map[string]string{
 	"dapla-lab-standard":          "https://statisticsnorway.github.io/dapla-lab-helm-charts-standard",
@@ -35,67 +38,147 @@ func parseConfig[T any]() (T, error) {
 	})
 }
 
+func ParseFilter[T any](filter string) (func(T) bool, error) {
+	prg, err := expr.Compile(filter, expr.Env(new(T)), expr.AsBool(), expr.WarnOnAny())
+	if err != nil {
+		return nil, err
+	}
+
+	return func(t T) bool {
+		res, _ := expr.Run(prg, t)
+		return res.(bool)
+	}, nil
+}
+
+func Filter[T any](d []T, s []T, keep func(T) bool) []T {
+	for _, t := range s {
+		if keep(t) {
+			d = append(d, t)
+		}
+	}
+	return d
+}
+
 func main() {
-	k8sClient, _ := initializeKubernetesClient()
+	k8sClient, helmSettings := initializeKubernetesClient()
 	ctx := context.Background()
 
-	filteredNamespaceLister, err := nsgetter.New(
-		k8sClient.CoreV1().Namespaces(),
-		nsgetter.WithExprFilter(namespaceFilter),
-	)
+	onyxiaMetaFilter, err := ParseFilter[onyxia.Service](onyxiaMetadataFilter)
 	if err != nil {
 		panic(err)
 	}
 
-	namespaces, err := filteredNamespaceLister.List(ctx)
+	// helmMetaFilter, err := ParseFilter[action.Metadata](helmMetadataFilter)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	helmReleaseFilter, err := ParseFilter[release.Release](helmReleaseFilter)
 	if err != nil {
 		panic(err)
 	}
 
-	onyxiaClient := onyxia.New(k8sClient.CoreV1())
+	allNamespacesSecretLister := k8sClient.CoreV1().Secrets("")
+	onyxiaClient := onyxia.New(allNamespacesSecretLister)
+
+	services, err := onyxiaClient.List(ctx)
+	if err != nil {
+		panic(err)
+	}
+	slog.Info("before onyxiaMetaFilter", "serviceCount", len(services))
+	services = Filter(nil, services, onyxiaMetaFilter)
+
+	slog.Info("before catalog filter", "serviceCount", len(services))
+	services = Filter(nil, services, func(s onyxia.Service) bool {
+		_, ok := catalogs[s.Catalog]
+		return ok
+	})
+
+	// metadataFilter := func(s onyxia.Service) bool {
+	// 	actionConfig := &action.Configuration{}
+	// 	if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, "", slog.Debug); err != nil {
+	// 		slog.Error("init action config get metadata", "service", s)
+	// 		return false
+	// 	}
+	// 	client := action.NewGetMetadata(actionConfig)
+	// 	metadata, err := client.Run(s.Name)
+	// 	if err != nil {
+	// 		slog.Error("get metadata", "service", s)
+	// 		return false
+	// 	}
+
+	// 	return helmMetaFilter(*metadata)
+	// }
+
+	// slog.Info("before metadataFilter", "serviceCount", len(services))
+	// services = Filter(nil, services, metadataFilter)
+
+	// valuesFilter := func(s onyxia.Service) bool {
+	// 	valuesLog := slog.With("service", s)
+	// 	actionConfig := &action.Configuration{}
+	// 	if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, "", slog.Debug); err != nil {
+	// 		valuesLog.Error("init action config get metadata", "service", s)
+	// 		return false
+	// 	}
+	// 	client := action.NewGetValues(actionConfig)
+	// 	values, err := client.Run(s.Name)
+	// 	if err != nil {
+	// 		valuesLog.Error("get values", "err", err)
+	// 		return false
+	// 	}
+
+	// 	res, err := expr.Eval(helmValuesFilter, values)
+	// 	if err != nil {
+	// 		valuesLog.Error("error in helm values filter", "filter", helmValuesFilter, "err", err)
+	// 		return false
+	// 	}
+
+	// 	if b, ok := res.(bool); ok {
+	// 		return b
+	// 	}
+
+	// 	valuesLog.Error("helm values filter does not evaluate to bool", "filter", helmValuesFilter, "type", reflect.TypeOf(res).String())
+	// 	return false
+	// }
+
+	// slog.Info("before valuesFilter", "serviceCount", len(services))
+	// services = Filter(nil, services, valuesFilter)
+
+	releaseFilter := func(s onyxia.Service) bool {
+		actionConfig := &action.Configuration{}
+		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, "", slog.Debug); err != nil {
+			slog.Error("init action config get metadata", "service", s)
+			return false
+		}
+		client := action.NewGet(actionConfig)
+		release, err := client.Run(s.Name)
+		if err != nil {
+			slog.Error("get helm release", "service", s)
+			return false
+		}
+
+		return helmReleaseFilter(*release)
+	}
+	slog.Info("before releaseFilter", "serviceCount", len(services))
+	services = Filter(nil, services, releaseFilter)
+
+	slog.Info("final", "serviceCount", len(services))
 	catalogServiceCount := map[string]int{}
 	for catalog := range catalogs {
 		catalogServiceCount[catalog] = 0
 	}
-
-	for _, namespace := range namespaces {
-		log.Printf("processing namespace %q", namespace.Name)
-		services, err := onyxiaClient.List(ctx, namespace.Name)
-		if err != nil {
-			log.Printf("list services in namespace %q: %v", namespace.Name, err)
+	for _, service := range services {
+		slog.Info("look", "service", service)
+		if _, ok := catalogs[service.Catalog]; !ok {
+			log.Printf("service %q has illegal catalog %q", service.Name, service.Catalog)
 			continue
 		}
-		log.Printf("namespace %q has %d onyxia services", namespace.Name, len(services))
-		for _, service := range services {
-			if _, ok := catalogs[service.Catalog]; !ok {
-				log.Printf("service %q has illegal catalog %q", service.Name, service.Catalog)
-				continue
-			}
-			catalogServiceCount[service.Catalog] += 1
-		}
+		catalogServiceCount[service.Catalog] += 1
 	}
 
 	for catalog, count := range catalogServiceCount {
 		log.Printf("%s: %d", catalog, count)
 	}
-}
-
-func Namespaces(ctx context.Context, namespaceClient corev1typed.NamespaceInterface) ([]corev1.Namespace, error) {
-	var namespaces []corev1.Namespace
-	cont := ""
-	for {
-		namespaceList, err := namespaceClient.List(context.Background(), v1.ListOptions{Continue: cont})
-		if err != nil {
-			return nil, err
-		}
-
-		namespaces = append(namespaces, namespaceList.Items...)
-		cont = namespaceList.Continue
-		if cont == "" {
-			break
-		}
-	}
-	return namespaces, nil
 }
 
 // initializeKubernetesClient initializes the Kubernetes client and Helm settings
