@@ -30,6 +30,7 @@ func (s *serviceSuspender) Process(ctx context.Context, swr onyxia.ServiceWithRe
 	log := swr.AddToLogger(slog.Default())
 
 	actionConfig := new(action.Configuration)
+	s.helmSettings.SetNamespace(swr.Release.Namespace)
 	if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), swr.Release.Namespace, "", log.Debug); err != nil {
 		log.Error("error initializing config for release suspension", "err", err)
 		return err

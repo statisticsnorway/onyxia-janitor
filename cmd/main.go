@@ -177,8 +177,10 @@ func main() {
 		log := swr.AddToLogger(slog.Default())
 		if err := serviceAction.Process(ctx, swr); err != nil {
 			log.Error("error processing service", "err", err)
+
+		} else {
+			log.Info("successfully processed service")
 		}
-		log.Info("successfully processed service")
 	}
 
 	if err := serviceAction.Finish(ctx); err != nil {
