@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
+	"helm.sh/helm/v3/pkg/release"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -30,12 +32,35 @@ type Service struct {
 	FriendlyName string
 }
 
+type ServiceWithRelease struct {
+	Service Service
+	Release release.Release
+}
+
+func (swr ServiceWithRelease) AddToLogger(log *slog.Logger) *slog.Logger {
+	return log.With(
+		slog.Group("service",
+			slog.String("friendlyName", swr.Service.Name),
+			slog.String("name", swr.Service.Name),
+			slog.String("catalog", swr.Service.Catalog),
+		),
+		slog.Group("release",
+			slog.String("name", swr.Release.Name),
+			slog.String("namespace", swr.Release.Namespace)),
+		slog.Group("chart",
+			slog.String("name", swr.Release.Chart.Metadata.Name),
+			slog.String("version", swr.Release.Chart.Metadata.Version),
+		),
+	)
+}
+
 func New(lister SecretLister) *client {
 	return &client{
 		lister: lister,
 	}
 }
 
+// List lists all Onyxia secrets that exist in the cluster.
 func (c *client) List(ctx context.Context) ([]Service, error) {
 	var services []Service
 	cont := ""
@@ -63,6 +88,41 @@ func (c *client) List(ctx context.Context) ([]Service, error) {
 	return services, nil
 }
 
+// ListConcurrent lists all Onyxia secrets present in the cluster concurrenctly
+// through the given channel.
+func (c *client) ListConcurrent(ctx context.Context, out chan Service) {
+	defer close(out)
+	cont := ""
+	for {
+		secrets, err := c.lister.List(ctx, v1.ListOptions{
+			Continue:      cont,
+			FieldSelector: fmt.Sprintf("type=%s", onyxiaSecretType),
+		})
+		if err != nil {
+			slog.Error("list concurrent", "err", err.Error())
+			return
+		}
+
+		for _, secret := range secrets.Items {
+			service, err := parseServiceSecret(secret)
+			if err != nil {
+				slog.Error("parse service", "err", err.Error())
+				return
+			}
+			select {
+			case out <- service:
+			case <-ctx.Done():
+				return
+			}
+		}
+
+		if cont == "" {
+			break
+		}
+	}
+}
+
+// parseServiceSecret parses the raw Kubernetes secret into a Service object.
 func parseServiceSecret(secret corev1.Secret) (Service, error) {
 	name := strings.TrimPrefix(secret.Name, onyxiaSecretPrefix)
 

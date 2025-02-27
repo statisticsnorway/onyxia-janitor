@@ -89,3 +89,36 @@ func (c *client) SendEmail(userEmail, subject, body string) error {
 		return fmt.Errorf("send email to %q, team api returned unknown status %q", userEmail, res.Status)
 	}
 }
+
+type UserInfo struct {
+	DisplayName string `json:"display_name"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	Email       string `json:"email"`
+}
+
+func (c *client) GetUser(userPrincipalEmail string) (*UserInfo, error) {
+	endpoint := fmt.Sprintf("%s/users/%s", c.teamApiUrl, userPrincipalEmail)
+
+	res, err := c.httpClient.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("get user info for %q: %w", userPrincipalEmail, err)
+	}
+	defer res.Body.Close()
+
+	switch res.StatusCode {
+	case http.StatusOK:
+		var ui UserInfo
+		dec := json.NewDecoder(res.Body)
+		if err := dec.Decode(&ui); err != nil {
+			return nil, fmt.Errorf("decode userinfo response: %w", err)
+		}
+		return &ui, nil
+	case http.StatusNotFound:
+		return nil, fmt.Errorf("team api could not find user %q", userPrincipalEmail)
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusInternalServerError:
+		return nil, fmt.Errorf("get user info for %q, team api returned %q", userPrincipalEmail, res.Status)
+	default:
+		return nil, fmt.Errorf("get user info for %q, team api returned unknown status %q", userPrincipalEmail, res.Status)
+	}
+}

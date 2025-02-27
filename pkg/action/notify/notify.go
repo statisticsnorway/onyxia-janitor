@@ -1,50 +1,59 @@
 package notify
 
 import (
+	"context"
 	"fmt"
-	"log"
-	"regexp"
+	"log/slog"
 	"strings"
-	"time"
 
-	"onyxia-janitor/common"
-
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
-	"k8s.io/client-go/kubernetes"
+	"onyxia-janitor/pkg/onyxia"
+	"onyxia-janitor/pkg/teamapi"
+	"onyxia-janitor/pkg/template"
 )
 
-var serviceNameRegex = regexp.MustCompile(`^([a-zA-Z-]+)`)
+type ServicesAndUserInfo struct {
+	UserInfo teamapi.UserInfo
+	Services []onyxia.ServiceWithRelease
+	Username string
+}
+
+type EmailTemplate = template.AnonymousTemplate[ServicesAndUserInfo]
 
 type emailNotifier struct {
-	kubernetes *kubernetes.Clientset
-	settings   *cli.EnvSettings
+	userServices map[string][]onyxia.ServiceWithRelease
 
-	timeThreshold time.Duration
+	subjectTemplate EmailTemplate
+	bodyTemplate    EmailTemplate
 
-	emailSender EmailSender
+	emailSender    EmailSender
+	userInfoGetter UserInfoGetter
 }
 
 type EmailSender interface {
 	SendEmail(user, subject, body string) error
 }
 
-type optFunc func(*emailNotifier)
-
-func WithTimeThreshold(threshold time.Duration) optFunc {
-	return func(n *emailNotifier) {
-		n.timeThreshold = threshold
-	}
+type UserInfoGetter interface {
+	GetUser(userPrincipalName string) (*teamapi.UserInfo, error)
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, sender EmailSender, opts ...optFunc) *emailNotifier {
-	notifier := &emailNotifier{
-		kubernetes: client,
-		settings:   settings,
+type optFunc func(*emailNotifier)
 
-		emailSender:   sender,
-		timeThreshold: 7 * 24 * time.Hour,
+func New(
+	sender EmailSender,
+	userGetter UserInfoGetter,
+	subjectTemplate EmailTemplate,
+	bodyTemplate EmailTemplate,
+	opts ...optFunc,
+) *emailNotifier {
+	notifier := &emailNotifier{
+		emailSender:     sender,
+		userInfoGetter:  userGetter,
+		subjectTemplate: subjectTemplate,
+		bodyTemplate:    bodyTemplate,
 	}
+
+	notifier.userServices = make(map[string][]onyxia.ServiceWithRelease)
 
 	for _, f := range opts {
 		f(notifier)
@@ -53,126 +62,75 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings, sender EmailSe
 	return notifier
 }
 
-func (n *emailNotifier) NotifyUsersAboutOldServices(prefix string) error {
-	log.Println("Checking for old Helm releases in user namespaces...")
+func (n *emailNotifier) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+	log := swr.AddToLogger(slog.Default())
 
-	namespaces, err := common.GetNamespacesWithPrefix(n.kubernetes, prefix)
+	user, err := getUsernameFromNamespace(swr.Service.Namespace)
 	if err != nil {
-		return fmt.Errorf("error retrieving namespaces: %w", err)
-	}
-
-	for _, namespace := range namespaces {
-		userEmail := getUserEmailFromNamespace(namespace)
-		if userEmail == "" {
-			log.Printf("Skipping namespace %s: Could not determine user email", namespace)
-			continue
-		}
-
-		oldReleases, err := n.getOldHelmReleases(namespace)
-		if err != nil {
-			log.Printf("Error checking Helm releases in namespace %s: %v", namespace, err)
-			continue
-		}
-
-		if len(oldReleases) > 0 {
-			err = n.sendEmailNotification(userEmail, oldReleases)
-			if err != nil {
-				log.Printf("Error sending email to %s: %v", userEmail, err)
-			} else {
-				log.Printf("Email notification sent to %s for namespace %s", userEmail, namespace)
-			}
-		}
-	}
-
-	return nil
-}
-
-func getUserEmailFromNamespace(namespace string) string {
-	if strings.HasPrefix(namespace, "user-ssb-") {
-		username := strings.TrimPrefix(namespace, "user-ssb-")
-		email := fmt.Sprintf("%s@ssb.no", strings.ToLower(username))
-		log.Printf("Mapped namespace %s to email: %s", namespace, email)
-		return email
-	}
-
-	log.Printf("Skipping namespace %s: Namespace format incorrect", namespace)
-	return ""
-}
-
-func (n *emailNotifier) getOldHelmReleases(namespace string) ([]string, error) {
-	actionConfig := new(action.Configuration)
-	n.settings.SetNamespace(namespace)
-
-	if err := actionConfig.Init(n.settings.RESTClientGetter(), namespace, "", log.Printf); err != nil {
-		return nil, fmt.Errorf("error initializing Helm action config: %w", err)
-	}
-
-	listAction := action.NewList(actionConfig)
-	listAction.AllNamespaces = false
-	listAction.Deployed = true
-
-	releases, err := listAction.Run()
-	if err != nil {
-		return nil, fmt.Errorf("error listing Helm releases in namespace %s: %w", namespace, err)
-	}
-
-	var oldReleases []string
-	now := time.Now()
-
-	for _, rel := range releases {
-		if now.Sub(rel.Info.FirstDeployed.Time) > n.timeThreshold {
-			oldReleases = append(oldReleases, rel.Name)
-		}
-	}
-
-	return oldReleases, nil
-}
-
-func cleanServiceName(service string) string {
-	matches := serviceNameRegex.FindStringSubmatch(service)
-	if len(matches) > 1 {
-		return strings.TrimSuffix(matches[1], "-")
-	}
-	return service
-}
-
-func (n *emailNotifier) sendEmailNotification(userEmail string, releases []string) error {
-	if len(userEmail) < 5 || !strings.Contains(userEmail, "@") {
-		log.Printf("Skipping email notification: Invalid email format %s", userEmail)
-		return nil
-	}
-
-	subject := "Dapla Lab: Du har tjenester som ble startet for mer enn 7 dager siden"
-
-	releaseTable := "<table border='1' style='border-collapse: collapse;'><tr><th>Tjeneste</th></tr>"
-	for _, release := range releases {
-		releaseTable += fmt.Sprintf("<tr><td>%s</td></tr>", cleanServiceName(release))
-	}
-	releaseTable += "</table>"
-
-	emailBody := fmt.Sprintf(`
-		<html>
-			<body>
-				<p>Hei %s,</p>
-				<p>Du har en eller flere tjenester (se tabell under) som ble startet for mer enn 7 dager siden.</p>
-				<p>Vi anbefaler deg å slette tjenester som ble startet for mer enn 7 dager siden slik at du jobber på siste versjon av tjenesten.</p>
-
-				%s <!-- Table of services -->
-
-				<p>Husk å pushe kode til GitHub, og ta vare på andre filer som ligger i tjenestens filsystem, før du sletter.</p>
-
-				<p>Vennlig hilsen,<br>Dapla Lab Team</p>
-			</body>
-		</html>`,
-		strings.Split(userEmail, "@")[0],
-		releaseTable,
-	)
-
-	if err := n.emailSender.SendEmail(userEmail, subject, emailBody); err != nil {
-		log.Printf("failed to send notification to %q: %s", userEmail, err)
+		log.Error("could not deduce username from namespace", "err", err)
 		return err
 	}
 
-	log.Printf("successfully sent notification email to %q", userEmail)
+	n.userServices[user] = append(n.userServices[user], swr)
 	return nil
+}
+
+func (n *emailNotifier) Finish(ctx context.Context) error {
+	for user := range n.userServices {
+		if err := n.notifyUser(ctx, user); err != nil {
+			slog.Error("failed to notify user", "user", user)
+		} else {
+			slog.Info("successfully notified user", "user", user)
+		}
+	}
+	return nil
+}
+
+func (n *emailNotifier) notifyUser(ctx context.Context, user string) error {
+	services, ok := n.userServices[user]
+	if !ok {
+		slog.Info("user has no registered old services, skipping", "user", user)
+		return nil
+	}
+	principalEmail := fmt.Sprintf("%s@ssb.no", user)
+	var ui *teamapi.UserInfo
+	if n.userInfoGetter != nil {
+		var err error
+		ui, err = n.userInfoGetter.GetUser(principalEmail)
+		if err != nil {
+			slog.Error("error getting user info", "user", user, "err", err)
+		}
+	}
+	if ui == nil {
+		ui = &teamapi.UserInfo{DisplayName: user}
+	}
+
+	sui := ServicesAndUserInfo{Username: user, Services: services, UserInfo: *ui}
+	subject, err := n.subjectTemplate.Execute(sui)
+	if err != nil {
+		slog.Error("failed to execute subject template", "err", err)
+		return err
+	}
+
+	body, err := n.bodyTemplate.Execute(sui)
+	if err != nil {
+		slog.Error("failed to execute body template", "err", err)
+		return err
+	}
+
+	if err := n.emailSender.SendEmail(principalEmail, subject, body); err != nil {
+		slog.Error("failed to send notification", "user", principalEmail, "err", err)
+		return err
+	}
+
+	slog.Info("successfully sent notification email", "user", principalEmail)
+	return nil
+}
+
+func getUsernameFromNamespace(namespace string) (string, error) {
+	if user := strings.TrimPrefix(namespace, "user-ssb-"); user != namespace {
+		return user, nil
+	}
+
+	return "", fmt.Errorf("incorrect namespace format %q", namespace)
 }
