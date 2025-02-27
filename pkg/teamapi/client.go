@@ -35,6 +35,7 @@ func NewClient(teamApiUrl, tokenUrl, clientId, clientSecret string, opts ...optF
 	httpClient.Timeout = time.Second * 10
 
 	c := &client{
+		httpClient:  httpClient,
 		teamApiUrl:  teamApiUrl,
 		senderEmail: "ikkesvar@ssb.no",
 	}

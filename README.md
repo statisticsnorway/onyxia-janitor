@@ -4,22 +4,26 @@ Onyxia-Janitor is an application written in GO for managing services deployed in
 ##
 How it works :
 
-Application runs in the Onyxia namespace, each job defined runs at set intervals in which it executes code.
+Onyxia Janitor is triggered based on Cronjobs placed in the cluster folders in dapla-lab-iac repo : https://github.com/statisticsnorway/dapla-lab-iac/tree/main/clusters
 
-Currently we have jobs for suspending services each night and a job for uninstalling failed service deploys.
+Each Cronjob is structured so the command you want to run is set as environment value, example : 
+
+            env:
+            - name: ONYXIA_JANITOR_ACTION
+              value: suspend
+
+The cronjob also has values for which helm releases it will affect etc.
+
+Once the cronjob schedule is triggered it will start a job that starts a pod with the Onyxia-Janitor image and performs the specified job.
 
 ##
 Basic structure :
 
-In cmd/main.go we use a package called "gocron" to run jobs at a schedule , example : 
+main.go , app starts when Cronjob triggers a job:
 
-```
-gocron.Every(1).Day().At("20:00").Do(func()
-```
+Parses env variables , starts "case" based on value of ONYXIA_JANITOR_ACTION.
 
-Here we can also adjust the time in which the job should run and at what interval.
-
-The job uses packages in /pkg folder , here we define the code for each job , "suspend" , "uninstall" etc
+Suspend, Notify, Uninstall is separated into separate pkg folders.
 
 ##
 Adding more jobs etc. :
