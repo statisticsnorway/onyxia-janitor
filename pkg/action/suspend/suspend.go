@@ -25,8 +25,10 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxi
 	}
 }
 
+// Process sets .global.suspend=true for the given service.
 func (s *serviceSuspender) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
+
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), swr.Release.Namespace, "", log.Debug); err != nil {
 		log.Error("error initializing config for release suspension", "err", err)
@@ -41,6 +43,8 @@ func (s *serviceSuspender) Process(ctx context.Context, swr onyxia.ServiceWithRe
 	}
 
 	chartPathOptions := action.ChartPathOptions{
+		// We here assume that catalog existence has been checked
+		// in a previous filter stage.
 		RepoURL: s.catalogs[swr.Service.Catalog].Url,
 		Version: swr.Release.Chart.Metadata.Version,
 	}
@@ -69,7 +73,6 @@ func (s *serviceSuspender) Process(ctx context.Context, swr onyxia.ServiceWithRe
 
 	log.Info("successfully suspended release")
 	return nil
-
 }
 
 func (s *serviceSuspender) Finish(ctx context.Context) error {

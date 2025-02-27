@@ -37,6 +37,7 @@ type ServiceWithRelease struct {
 	Release release.Release
 }
 
+// AddToLogger adds some context to the given slog.Logger
 func (swr ServiceWithRelease) AddToLogger(log *slog.Logger) *slog.Logger {
 	return log.With(
 		slog.Group("service",

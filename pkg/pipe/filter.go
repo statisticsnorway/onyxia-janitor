@@ -2,10 +2,12 @@ package pipe
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/expr-lang/expr"
 )
 
+// Filter is a custom type in order to support unmarshalling
 type Filter[T any] func(T) bool
 
 func (f *Filter[T]) UnmarshalText(data []byte) error {
@@ -29,8 +31,14 @@ func ParseFilter[T any](filter string) (Filter[T], error) {
 	}, nil
 }
 
-func (f Filter[T]) Run(ctx context.Context, in <-chan T, out chan T) {
-	defer close(out)
+func (f Filter[T]) Run(ctx context.Context, in <-chan T, out chan T, log *slog.Logger) {
+	var filtered, total int
+	defer func() {
+		close(out)
+		if log != nil {
+			log.Info("filter summary", slog.Int("total", total), slog.Int("filtered", filtered))
+		}
+	}()
 	for {
 		select {
 		case <-ctx.Done():
@@ -39,7 +47,9 @@ func (f Filter[T]) Run(ctx context.Context, in <-chan T, out chan T) {
 			if !ok {
 				return
 			}
+			total++
 			if f(t) {
+				filtered++
 				out <- t
 			}
 		}

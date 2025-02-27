@@ -11,6 +11,7 @@ import (
 	"onyxia-janitor/pkg/template"
 )
 
+// ServicesAndUserInfo is provided as the context for the email templates.
 type ServicesAndUserInfo struct {
 	UserInfo teamapi.UserInfo
 	Services []onyxia.ServiceWithRelease
@@ -62,6 +63,8 @@ func New(
 	return notifier
 }
 
+// Process handles one user service at a time. In this case we just want
+// to accumulate all the user's services and process them all at once in Finish.
 func (n *emailNotifier) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 
@@ -75,6 +78,7 @@ func (n *emailNotifier) Process(ctx context.Context, swr onyxia.ServiceWithRelea
 	return nil
 }
 
+// Finish sends emails to all the users about the services processed in Process
 func (n *emailNotifier) Finish(ctx context.Context) error {
 	for user := range n.userServices {
 		if err := n.notifyUser(ctx, user); err != nil {
@@ -86,6 +90,7 @@ func (n *emailNotifier) Finish(ctx context.Context) error {
 	return nil
 }
 
+// notifyUser sends an email to one user about their old services.
 func (n *emailNotifier) notifyUser(ctx context.Context, user string) error {
 	services, ok := n.userServices[user]
 	if !ok {
@@ -127,6 +132,13 @@ func (n *emailNotifier) notifyUser(ctx context.Context, user string) error {
 	return nil
 }
 
+// getUsernameFromNamespace returns the username associated with
+// the namespace. In our case we just trim the user-ssb- prefix.
+// In the future this should be configurable.
+//
+// NOTE: Some accounts (users with an underscore in their name) will
+// not work with this method. This is a problem with several applications
+// in Dapla Lab atm.
 func getUsernameFromNamespace(namespace string) (string, error) {
 	if user := strings.TrimPrefix(namespace, "user-ssb-"); user != namespace {
 		return user, nil

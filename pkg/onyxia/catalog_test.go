@@ -18,7 +18,7 @@ func TestUnmarshalCatalogs(t *testing.T) {
 	}{
 		{
 			Description: "only vscode-python",
-			Text:        `{ "dapla": { "include": ["vscode-python"] } }`,
+			Text:        `{ "dapla": { "filter": "Metadata.Name startsWith \"vscode\"" } }`,
 			Releases: []release.Release{
 				{
 					Chart: &chart.Chart{Metadata: &chart.Metadata{Name: "vscode-python"}},
@@ -48,7 +48,7 @@ func TestUnmarshalCatalogs(t *testing.T) {
 		}
 		for i := range tt.Releases {
 			if res := (catalogs)["dapla"].FilterRelease(tt.Releases[i]); res != tt.Expected[i] {
-				t.Errorf("FilterRelease(%s) = %v, expected %v, included=%v", tt.Releases[i].Name, res, tt.Expected[i], (catalogs)["onyxia"].Include)
+				t.Errorf("FilterRelease(%s) = %v, expected %v, included=%v", tt.Releases[i].Name, res, tt.Expected[i], tt.Text)
 			}
 		}
 	}

@@ -3,9 +3,10 @@ package onyxia
 import (
 	"errors"
 	"fmt"
-	"slices"
 
+	"github.com/expr-lang/expr"
 	"gopkg.in/yaml.v3"
+	"helm.sh/helm/v3/pkg/chart"
 	"helm.sh/helm/v3/pkg/release"
 )
 
@@ -34,26 +35,31 @@ func (c Catalogs) Exists(catalogName string) bool {
 }
 
 type Catalog struct {
-	Include []string `yaml:"include" json:"include"`
-	Exclude []string `yaml:"exclude"`
-	Url     string   `yaml:"url"`
+	Filter ChartFilter `yaml:"filter"`
+	Url    string      `yaml:"url"`
 }
 
-// FilterRelease filters out releases if:
-// - Catalog.Include is given, and the release is not in it
-// - Catalog.Exclude is given, and the release is in it
+type ChartFilter func(chart.Chart) bool
+
+func (f *ChartFilter) UnmarshalYAML(value *yaml.Node) error {
+	prg, err := expr.Compile(value.Value, expr.Env(chart.Chart{}), expr.AsBool(), expr.WarnOnAny())
+	if err != nil {
+		return err
+	}
+	*f = func(c chart.Chart) bool {
+		res, _ := expr.Run(prg, c)
+		return res.(bool)
+	}
+	return nil
+}
+
+// FilterRelease filters out releases using the given filter
 func (c Catalog) FilterRelease(r release.Release) bool {
-	if c.Include != nil {
-		if !slices.Contains(c.Include, r.Chart.Metadata.Name) {
-			return false
-		}
+	if c.Filter == nil {
+		return true
 	}
-
-	if c.Exclude != nil {
-		if slices.Contains(c.Exclude, r.Chart.Metadata.Name) {
-			return false
-		}
+	if r.Chart == nil || r.Chart.Metadata == nil {
+		return false
 	}
-
-	return true
+	return c.Filter(*r.Chart)
 }

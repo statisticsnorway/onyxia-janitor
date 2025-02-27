@@ -23,6 +23,9 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *serviceUninst
 	}
 }
 
+// Process uninstalls the given service' Helm release if it has failed
+// In the future this will probably just uninstall without any checks,
+// as the checks will be in the filters before the action is run.
 func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 	actionConfig := new(action.Configuration)

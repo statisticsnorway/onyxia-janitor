@@ -50,7 +50,13 @@ func parseConfig[T any]() (T, error) {
 	})
 }
 
+type ServiceWithReleaseAction interface {
+	Process(ctx context.Context, swr onyxia.ServiceWithRelease) error
+	Finish(ctx context.Context) error
+}
+
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	k8sClient, helmSettings := initializeKubernetesClient()
 	ctx := context.Background()
 
@@ -84,23 +90,40 @@ func main() {
 			notifyCfg.ClientSecret,
 		)
 		serviceAction = notify.New(teamapi, teamapi, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate)
+	default:
+		slog.Error("unknown action", "action", cfg.Action)
+		os.Exit(1)
 	}
+	slog.Info("determined action", "action", cfg.Action)
 
 	allNamespacesSecretLister := k8sClient.CoreV1().Secrets("")
 	onyxiaClient := onyxia.New(allNamespacesSecretLister)
 
 	outList := make(chan onyxia.Service, 10)
 	go onyxiaClient.ListConcurrent(ctx, outList)
+	slog.Info("started service lister")
 
 	onyxiaMetaOut := make(chan onyxia.Service, 10)
-	go cfg.OnyxiaMetadataFilter.Run(ctx, outList, onyxiaMetaOut)
+	go cfg.OnyxiaMetadataFilter.Run(
+		ctx,
+		outList,
+		onyxiaMetaOut,
+		slog.With("filter", "onyxiaMetadata"),
+	)
+	slog.Info("started onyxia metadata filter")
 
 	catalogOut := make(chan onyxia.Service, 10)
 	catalogFilter := pipe.Filter[onyxia.Service](func(s onyxia.Service) bool {
 		_, ok := cfg.Catalogs[s.Catalog]
 		return ok
 	})
-	go catalogFilter.Run(ctx, onyxiaMetaOut, catalogOut)
+	go catalogFilter.Run(
+		ctx,
+		onyxiaMetaOut,
+		catalogOut,
+		slog.With("filter", "catalog"),
+	)
+	slog.Info("started catalog filter")
 
 	releaseMapper := func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
 		actionConfig := &action.Configuration{}
@@ -121,6 +144,7 @@ func main() {
 	}
 	releaseMapOut := make(chan onyxia.ServiceWithRelease, 10)
 	go pipe.Map(ctx, releaseMapper, catalogOut, releaseMapOut)
+	slog.Info("started release mapper")
 
 	releaseFilter := pipe.Filter[onyxia.ServiceWithRelease](func(swr onyxia.ServiceWithRelease) bool {
 		s := swr.Service
@@ -141,7 +165,13 @@ func main() {
 		return cfg.HelmReleaseFilter(*release)
 	})
 	releaseFilterOut := make(chan onyxia.ServiceWithRelease, 10)
-	go releaseFilter.Run(ctx, releaseMapOut, releaseFilterOut)
+	go releaseFilter.Run(
+		ctx,
+		releaseMapOut,
+		releaseFilterOut,
+		slog.With("filter", "release"),
+	)
+	slog.Info("started release filter")
 
 	for swr := range releaseFilterOut {
 		log := swr.AddToLogger(slog.Default())
@@ -154,11 +184,6 @@ func main() {
 	if err := serviceAction.Finish(ctx); err != nil {
 		slog.Error("failed to finish action", "err", err)
 	}
-}
-
-type ServiceWithReleaseAction interface {
-	Process(ctx context.Context, swr onyxia.ServiceWithRelease) error
-	Finish(ctx context.Context) error
 }
 
 // initializeKubernetesClient initializes the Kubernetes client and Helm settings
