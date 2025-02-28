@@ -24,7 +24,7 @@ and some are needed exclusively by the `notify` action.
 
 ### Common configuration
 | Name | Description | Required | Default |
-| --------------------------------------- |
+| ---- | ----------- | -------- | ------- |
 | ONYXIA_JANITOR_ACTION | One of [suspend, notify, uninstall] | x | |
 | ONYXIA_JANITOR_ONYXIA_CATALOGS | [YAML map of catalogs](#onyxia-catalog-configuration) | x | |
 | ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct | | `true` |
@@ -35,7 +35,7 @@ and some are needed exclusively by the `notify` action.
 The `notify` action communicates with Dapla Team API and so needs a few extra environment variables.
 
 | Name | Description | Required | Default |
-| --------------------------------------- |
+| ---- | ----------- | -------- | ------- |
 | ONYXIA_JANITOR_CLIENT_SECRET | Client secret for Onyxia Janitor's Keycloak client | x | |
 | ONYXIA_JANITOR_CLIENT_ID | Client ID for Onyxia Janitor's Keycloak client | x | |
 | ONYXIA_JANITOR_TOKEN_URL | OIDC endpoint for fetching access token | x |
