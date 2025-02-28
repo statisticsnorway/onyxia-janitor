@@ -47,7 +47,7 @@ Helm charts. Included are also all of the functions in the [sprig](https://maste
 The context for the templates is the [ServicesAndUserInfo](pkg/action/notify/notify.go#L14) struct.
 
 | Name | Description | Required | Default |
-| --------------------------------------- |
+| ---- | ----------- | -------- | ------- |
 | ONYXIA_JANITOR_SUBJECT_TEMPLATE | Template used to render the email's subject line | x | |
 | ONYXIA_JANITOR_BODY_TEMPLATE | Tempalte used to render the email's body | x | |
 
@@ -59,25 +59,25 @@ Dapla Lab Dev: Du har tjenester som ble starter for mer enn 7 dager siden
 
 BODY
 <html>
-	<body>
-		<p>Hei {{ .UserInfo.DisplayName }},</p>
-  	<p>[Du har en eller flere tjenester](https://lab.url/my-services) (se tabell under) som ble startet for mer enn 7 dager siden.</p>
+  <body>
+    <p>Hei {{ .UserInfo.DisplayName }},</p>
+    <p>[Du har en eller flere tjenester](https://lab.url/my-services) (se tabell under) som ble startet for mer enn 7 dager siden.</p>
     <p>Vi anbefaler deg å slette tjenester som ble startet for mer enn 7 dager siden slik at du jobber på siste versjon av tjenesten.</p>
 
     <table border='1' style='border-collapse: collapse;'>
-    	<tr>
-   			<th>Tjeneste</th>
-    		<th>Antall dager</th>
+      <tr>
+         <th>Tjeneste</th>
+        <th>Antall dager</th>
       </tr>
       {{ range .Services }}
       <tr>
-       	<td>{{ .Service.FriendlyName }}</td>
-       	<td>{{ div (.Release.Info.FirstDeployed.Time | now.Sub).Hours 24 }}</td>
+         <td>{{ .Service.FriendlyName }}</td>
+         <td>{{ div (.Release.Info.FirstDeployed.Time | now.Sub).Hours 24 }}</td>
       </tr>
       {{ end }}
     </table>
 
-   	<p>Husk å pushe kode til GitHub, og ta vare på andre filer som ligger i tjenestens filsystem, før du sletter.</p>
+     <p>Husk å pushe kode til GitHub, og ta vare på andre filer som ligger i tjenestens filsystem, før du sletter.</p>
   </body>
 </html>
 ```
