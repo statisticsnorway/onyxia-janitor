@@ -13,3 +13,6 @@ spec:
   type: service
   owner: dapla-skyinfra-developers
   lifecycle: production
+  system: dapla-lab
+  consumesApis:
+    - dapla-team-api
