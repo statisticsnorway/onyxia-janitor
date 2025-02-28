@@ -41,7 +41,7 @@ type ServiceWithRelease struct {
 func (swr ServiceWithRelease) AddToLogger(log *slog.Logger) *slog.Logger {
 	return log.With(
 		slog.Group("service",
-			slog.String("friendlyName", swr.Service.Name),
+			slog.String("friendlyName", swr.Service.FriendlyName),
 			slog.String("name", swr.Service.Name),
 			slog.String("catalog", swr.Service.Catalog),
 		),
@@ -134,6 +134,7 @@ func parseServiceSecret(secret corev1.Secret) (Service, error) {
 
 	friendlyName, ok := secret.Data[secretFriendlyNameKey]
 	if !ok {
+		slog.Error("friendly name not found", "data", secret.Data)
 		friendlyName = []byte(name)
 	}
 

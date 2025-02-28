@@ -14,17 +14,9 @@ import (
 type client struct {
 	httpClient *http.Client
 	teamApiUrl string
-
-	senderEmail string
 }
 
 type optFunc func(*client)
-
-func WithSenderEmail(email string) optFunc {
-	return func(c *client) {
-		c.senderEmail = email
-	}
-}
 
 func NewClient(teamApiUrl, tokenUrl, clientId, clientSecret string, opts ...optFunc) *client {
 	httpClient := (&clientcredentials.Config{
@@ -35,9 +27,8 @@ func NewClient(teamApiUrl, tokenUrl, clientId, clientSecret string, opts ...optF
 	httpClient.Timeout = time.Second * 10
 
 	c := &client{
-		httpClient:  httpClient,
-		teamApiUrl:  teamApiUrl,
-		senderEmail: "ikkesvar@ssb.no",
+		httpClient: httpClient,
+		teamApiUrl: teamApiUrl,
 	}
 
 	for _, opt := range opts {
@@ -52,9 +43,8 @@ type teamApiMessageForUser struct {
 }
 
 type teamApiEmail struct {
-	Subject  string `json:"subject"`
-	Body     string `json:"body"`
-	FromName string `json:"from_name"`
+	Subject string `json:"subject"`
+	Body    string `json:"body"`
 }
 
 func (c *client) SendEmail(userEmail, subject, body string) error {
@@ -62,9 +52,8 @@ func (c *client) SendEmail(userEmail, subject, body string) error {
 
 	msg := teamApiMessageForUser{
 		Email: teamApiEmail{
-			Subject:  subject,
-			Body:     body,
-			FromName: c.senderEmail,
+			Subject: subject,
+			Body:    body,
 		},
 	}
 	msgJson, _ := json.Marshal(msg)
