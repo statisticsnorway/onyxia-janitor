@@ -61,7 +61,7 @@ BODY
 <html>
   <body>
     <p>Hei {{ .UserInfo.DisplayName }},</p>
-    <p>[Du har en eller flere tjenester](https://lab.url/my-services) (se tabell under) som ble startet for mer enn 7 dager siden.</p>
+    <p><a href="https://lab.url/my-services">Du har en eller flere tjenester</a> (se tabell under) som ble startet for mer enn 7 dager siden.</p>
     <p>Vi anbefaler deg å slette tjenester som ble startet for mer enn 7 dager siden slik at du jobber på siste versjon av tjenesten.</p>
 
     <table border='1' style='border-collapse: collapse;'>
