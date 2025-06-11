@@ -84,6 +84,14 @@ BODY
 </html>
 ```
 
+### Extra configuration for `setvalues` action
+
+The `setvalues` action run helm upgrade with a provided map. This is useful to update the values used by the services in
+a effective and safe way vs. manually editing or running helm upgrade from the command line locally.
+
+| Name                         | Description                                                                                                                                                                                                | Required | Default |
+|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
+| ONYXIA_JANITOR_VALUES_MAPPER | A [Expr-lang](https://expr-lang.org/playground) program that evaluets to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
 
 ### Onyxia catalog configuration
 
