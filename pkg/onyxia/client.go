@@ -32,6 +32,7 @@ type Service struct {
 	FriendlyName string
 }
 
+// This struct is avaiable in expr. Fields can be accessed via .Service.[...] or .Release.[...]
 type ServiceWithRelease struct {
 	Service Service
 	Release release.Release

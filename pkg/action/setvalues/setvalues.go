@@ -34,10 +34,10 @@ func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease
 	actionConfig := new(action.Configuration)
 	s.helmSettings.SetNamespace(swr.Release.Namespace)
 	if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), swr.Release.Namespace, "", log.Debug); err != nil {
-		log.Error("error initializing config for release suspension", "err", err)
+		log.Error("error initializing config for setvalues", "err", err)
 		return err
 	}
-	log.Debug("attempting to suspend release")
+	log.Debug("attempting to setvalues")
 
 	values, err := s.valuesMapper(swr)
 	if err != nil {
@@ -74,7 +74,7 @@ func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease
 		return err
 	}
 
-	log.Info("successfully suspended release")
+	log.Info("successfully setvalues")
 	return nil
 }
 
