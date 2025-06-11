@@ -1,4 +1,5 @@
 # onyxia-janitor
+
 Onyxia-Janitor is an application written in Go for managing services deployed into Onyxia/Dapla Lab
 
 ## How it works:
@@ -23,33 +24,34 @@ Some are required regardless of which action you want to perform,
 and some are needed exclusively by the `notify` action.
 
 ### Common configuration
-| Name | Description | Required | Default |
-| ---- | ----------- | -------- | ------- |
-| ONYXIA_JANITOR_ACTION | One of [suspend, notify, uninstall] | x | |
-| ONYXIA_JANITOR_ONYXIA_CATALOGS | [YAML map of catalogs](#onyxia-catalog-configuration) | x | |
-| ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct | | `true` |
-| ONYXIA_JANITOR_HELM_RELEASE_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Release](https://pkg.go.dev/helm.sh/helm/v3@v3.17.1/pkg/release#Release) struct | | `true` |
+
+| Name                                  | Description                                                                                                                                                       | Required | Default |
+|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
+| ONYXIA_JANITOR_ACTION                 | One of [suspend, notify, uninstall]                                                                                                                               | x        |         |
+| ONYXIA_JANITOR_ONYXIA_CATALOGS        | [YAML map of catalogs](#onyxia-catalog-configuration)                                                                                                             | x        |         |
+| ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct                                       |          | `true`  |
+| ONYXIA_JANITOR_HELM_RELEASE_FILTER    | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Release](https://pkg.go.dev/helm.sh/helm/v3@v3.17.1/pkg/release#Release) struct |          | `true`  |
 
 ### Extra configuration for `notify` action
 
 The `notify` action communicates with Dapla Team API and so needs a few extra environment variables.
 
-| Name | Description | Required | Default |
-| ---- | ----------- | -------- | ------- |
-| ONYXIA_JANITOR_CLIENT_SECRET | Client secret for Onyxia Janitor's Keycloak client | x | |
-| ONYXIA_JANITOR_CLIENT_ID | Client ID for Onyxia Janitor's Keycloak client | x | |
-| ONYXIA_JANITOR_TOKEN_URL | OIDC endpoint for fetching access token | x |
-| ONYXIA_JANITOR_TEAM_API_URL | Base URL for for the Dapla Team API instance to use | x | |
+| Name                         | Description                                         | Required | Default |
+|------------------------------|-----------------------------------------------------|----------|---------|
+| ONYXIA_JANITOR_CLIENT_SECRET | Client secret for Onyxia Janitor's Keycloak client  | x        |         |
+| ONYXIA_JANITOR_CLIENT_ID     | Client ID for Onyxia Janitor's Keycloak client      | x        |         |
+| ONYXIA_JANITOR_TOKEN_URL     | OIDC endpoint for fetching access token             | x        |
+| ONYXIA_JANITOR_TEAM_API_URL  | Base URL for for the Dapla Team API instance to use | x        |         |
 
 In addition, we need templates for creating emails, these are written using Go's built-in
 [html/template](https://pkg.go.dev/html/template) package, which should feel familiar from e.g.
 Helm charts. Included are also all of the functions in the [sprig](https://masterminds.github.io/sprig/) library.
 The context for the templates is the [ServicesAndUserInfo](pkg/action/notify/notify.go#L14) struct.
 
-| Name | Description | Required | Default |
-| ---- | ----------- | -------- | ------- |
-| ONYXIA_JANITOR_SUBJECT_TEMPLATE | Template used to render the email's subject line | x | |
-| ONYXIA_JANITOR_BODY_TEMPLATE | Tempalte used to render the email's body | x | |
+| Name                            | Description                                      | Required | Default |
+|---------------------------------|--------------------------------------------------|----------|---------|
+| ONYXIA_JANITOR_SUBJECT_TEMPLATE | Template used to render the email's subject line | x        |         |
+| ONYXIA_JANITOR_BODY_TEMPLATE    | Tempalte used to render the email's body         | x        |         |
 
 Here's an example (more or less ready for use) for subject and body templates:
 
@@ -87,10 +89,10 @@ BODY
 
 The `ONYXIA_JANITOR_ONYXIA_CATALOGS` variable should be a map from the catalog name - as
 configured in your Onyxia instance - to an object with properties `[url, filter]`.
-`url` is required, while `filter` is optional. If given, it should be an [expr-lang](https://expr-lang.org/docs/language-definition) acting
+`url` is required, while `filter` is optional. If given, it should be
+an [expr-lang](https://expr-lang.org/docs/language-definition) acting
 on a [Chart](http://pkg.go.dev/helm.sh/helm/v3@v3.17.1/pkg/chart#Chart) struct. The filter
 is validated on startup.
-
 
 ## Project structure:
 
