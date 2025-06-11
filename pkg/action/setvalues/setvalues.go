@@ -44,6 +44,7 @@ func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease
 		slog.Error("error mapping values to set", "err", err)
 		return err
 	}
+	slog.Debug("Computed values with mapper", "values", values)
 
 	chartPathOptions := action.ChartPathOptions{
 		// We here assume that catalog existence has been checked

@@ -38,6 +38,7 @@ func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWith
 		return nil
 	}
 	uninstallAction := action.NewUninstall(actionConfig)
+	slog.Debug("Running uninstall action", "action", uninstallAction)
 	_, err := uninstallAction.Run(swr.Release.Name)
 	if err != nil {
 		log.Error("error uninstalling release", "err", err)
