@@ -13,6 +13,7 @@ import (
 	"onyxia-janitor/pkg/teamapi"
 	"os"
 	"reflect"
+	"strings"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
@@ -63,7 +64,7 @@ type ServiceWithReleaseAction interface {
 }
 
 func main() {
-	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: getLogLevelFromEnv()})))
 	k8sClient, helmSettings := initializeKubernetesClient()
 	ctx := context.Background()
 
@@ -235,4 +236,20 @@ func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 	settings := cli.New()
 	settings.SetNamespace("")
 	return k8sClient, settings
+}
+
+func getLogLevelFromEnv() slog.Level {
+	levelStr := os.Getenv("GO_LOG")
+	switch strings.ToLower(levelStr) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

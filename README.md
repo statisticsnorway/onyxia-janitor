@@ -31,6 +31,7 @@ and some are needed exclusively by the `notify` action.
 | ONYXIA_JANITOR_ONYXIA_CATALOGS        | [YAML map of catalogs](#onyxia-catalog-configuration)                                                                                                             | x        |         |
 | ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct                                       |          | `true`  |
 | ONYXIA_JANITOR_HELM_RELEASE_FILTER    | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Release](https://pkg.go.dev/helm.sh/helm/v3@v3.17.1/pkg/release#Release) struct |          | `true`  |
+| GO_LOG                                | Logging level for the application. Useful for debugging or printing out expr evaluations                                                                          |          | `info`  |
 
 ### Extra configuration for `notify` action
 
