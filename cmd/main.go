@@ -5,12 +5,14 @@ import (
 	"log"
 	"log/slog"
 	"onyxia-janitor/pkg/action/notify"
+	"onyxia-janitor/pkg/action/setvalues"
 	"onyxia-janitor/pkg/action/suspend"
 	"onyxia-janitor/pkg/action/uninstall"
 	"onyxia-janitor/pkg/onyxia"
 	"onyxia-janitor/pkg/pipe"
 	"onyxia-janitor/pkg/teamapi"
 	"os"
+	"reflect"
 
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/cli"
@@ -20,6 +22,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 
 	"github.com/caarlos0/env/v11"
+	"github.com/expr-lang/expr"
 )
 
 // const helmValuesFilter = ` global?.suspend ?? true`
@@ -42,6 +45,10 @@ type notifyConfig struct {
 	ClientId        string               `env:"CLIENT_ID,required,notEmpty"`
 	TokenUrl        string               `env:"TOKEN_URL,required,notEmpty"`
 	TeamApiUrl      string               `env:"TEAM_API_URL,required,notEmpty"`
+}
+
+type setValuesConfig struct {
+	ValuesMapper string `env:"VALUES_MAPPER,required,notEmpty"`
 }
 
 func parseConfig[T any]() (T, error) {
@@ -75,6 +82,24 @@ func main() {
 	switch cfg.Action {
 	case "suspend":
 		serviceAction = suspend.New(k8sClient, helmSettings, cfg.Catalogs)
+	case "setvalues":
+		setValuesConfig, err := parseConfig[setValuesConfig]()
+		if err != nil {
+			slog.Error("error reading setvalues config", "err", err)
+			os.Exit(1)
+		}
+		prg, err := expr.Compile(setValuesConfig.ValuesMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeOf(map[string]any{}).Kind()), expr.WarnOnAny())
+		if err != nil {
+			slog.Error("error parsing setvalues mapper", "err", err)
+			os.Exit(1)
+		}
+		serviceAction = setvalues.New(k8sClient, helmSettings, cfg.Catalogs, func(swr onyxia.ServiceWithRelease) (map[string]any, error) {
+			res, err := expr.Run(prg, swr)
+			if err != nil {
+				return nil, err
+			}
+			return res.(map[string]any), nil
+		})
 	case "uninstall":
 		serviceAction = uninstall.New(k8sClient, helmSettings)
 	case "notify":
