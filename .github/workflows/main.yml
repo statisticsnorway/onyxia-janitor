@@ -24,7 +24,7 @@ on:
       - published
 
 env:
-  REGISTRY: europe-west4-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker
+  REGISTRY: europe-north1-docker.pkg.dev/artifact-registry-5n/dapla-lab-docker
   IMAGE: onyxia-janitor
 
 jobs:
