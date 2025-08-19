@@ -8,6 +8,7 @@ import (
 	"onyxia-janitor/pkg/action/setvalues"
 	"onyxia-janitor/pkg/action/suspend"
 	"onyxia-janitor/pkg/action/uninstall"
+	"onyxia-janitor/pkg/action/upgrade"
 	"onyxia-janitor/pkg/onyxia"
 	"onyxia-janitor/pkg/pipe"
 	"onyxia-janitor/pkg/teamapi"
@@ -50,6 +51,10 @@ type notifyConfig struct {
 
 type setValuesConfig struct {
 	ValuesMapper string `env:"VALUES_MAPPER,required,notEmpty"`
+}
+
+type upgradeConfig struct {
+	Version string `env:"UPGRADE_VERSION,required,notEmpty"`
 }
 
 func parseConfig[T any]() (T, error) {
@@ -101,6 +106,14 @@ func main() {
 			}
 			return res.(map[string]any), nil
 		})
+	case "upgrade":
+		upgradeConfig, err := parseConfig[upgradeConfig]()
+		if err != nil {
+			slog.Error("error reading upgrade config", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("upgrade version", upgradeConfig.Version)
+		serviceAction = upgrade.New(k8sClient, helmSettings, cfg.Catalogs, upgradeConfig.Version)
 	case "uninstall":
 		serviceAction = uninstall.New(k8sClient, helmSettings)
 	case "notify":
