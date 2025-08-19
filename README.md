@@ -26,8 +26,8 @@ and some are needed exclusively by the `notify` action.
 ### Common configuration
 
 | Name                                  | Description                                                                                                                                                       | Required | Default |
-|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
-| ONYXIA_JANITOR_ACTION                 | One of [suspend, notify, uninstall]                                                                                                                               | x        |         |
+| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
+| ONYXIA_JANITOR_ACTION                 | One of [suspend, notify, uninstall, setvalues, upgrade]                                                                                                           | x        |         |
 | ONYXIA_JANITOR_ONYXIA_CATALOGS        | [YAML map of catalogs](#onyxia-catalog-configuration)                                                                                                             | x        |         |
 | ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct                                       |          | `true`  |
 | ONYXIA_JANITOR_HELM_RELEASE_FILTER    | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Release](https://pkg.go.dev/helm.sh/helm/v3@v3.17.1/pkg/release#Release) struct |          | `true`  |
@@ -38,7 +38,7 @@ and some are needed exclusively by the `notify` action.
 The `notify` action communicates with Dapla Team API and so needs a few extra environment variables.
 
 | Name                         | Description                                         | Required | Default |
-|------------------------------|-----------------------------------------------------|----------|---------|
+| ---------------------------- | --------------------------------------------------- | -------- | ------- |
 | ONYXIA_JANITOR_CLIENT_SECRET | Client secret for Onyxia Janitor's Keycloak client  | x        |         |
 | ONYXIA_JANITOR_CLIENT_ID     | Client ID for Onyxia Janitor's Keycloak client      | x        |         |
 | ONYXIA_JANITOR_TOKEN_URL     | OIDC endpoint for fetching access token             | x        |
@@ -50,7 +50,7 @@ Helm charts. Included are also all of the functions in the [sprig](https://maste
 The context for the templates is the [ServicesAndUserInfo](pkg/action/notify/notify.go#L14) struct.
 
 | Name                            | Description                                      | Required | Default |
-|---------------------------------|--------------------------------------------------|----------|---------|
+| ------------------------------- | ------------------------------------------------ | -------- | ------- |
 | ONYXIA_JANITOR_SUBJECT_TEMPLATE | Template used to render the email's subject line | x        |         |
 | ONYXIA_JANITOR_BODY_TEMPLATE    | Tempalte used to render the email's body         | x        |         |
 
@@ -91,8 +91,19 @@ The `setvalues` action run helm upgrade with a provided map. This is useful to u
 a effective and safe way vs. manually editing or running helm upgrade from the command line locally.
 
 | Name                         | Description                                                                                                                                                                                                | Required | Default |
-|------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
 | ONYXIA_JANITOR_VALUES_MAPPER | A [Expr-lang](https://expr-lang.org/playground) program that evaluets to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
+
+### Extra configuration for `upgrade` action
+
+The `upgrade` action upgrades or downgrades a release to the version set in `ONYXIA_JANITOR_UPGRADE_VERSION`.
+This can be destructive if the upgrade is ran on a old release with changes to the charts values.
+It is recommanded to only run this upgrade on the same minor release, e.g. from `0.15.1` to `0.15.7`,
+this can be done by setting `ONYXIA_JANITOR_HELM_RELEASE_FILTER` to e.g `Chart.Metadata.Version < "0.15.7" and Chart.Metadata.Version >= "0.15.1"`
+
+| Name                           | Description                                                      | Required | Default |
+| ------------------------------ | ---------------------------------------------------------------- | -------- | ------- |
+| ONYXIA_JANITOR_UPGRADE_VERSION | A string containing a semver version of the chart. E.g. `0.15.7` | x        |         |
 
 ### Onyxia catalog configuration
 
