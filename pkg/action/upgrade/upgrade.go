@@ -45,7 +45,7 @@ func (s *ServiceUpgrader) Process(ctx context.Context, swr onyxia.ServiceWithRel
 }
 
 // Internal function such that we can wrap the FailedItems instead of having it in each err check
-func (s *ServiceUpgrader) process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+func (s *ServiceUpgrader) process(_ context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 
 	actionConfig := new(action.Configuration)
@@ -93,6 +93,6 @@ func (s *ServiceUpgrader) process(ctx context.Context, swr onyxia.ServiceWithRel
 	return nil
 }
 
-func (s *ServiceUpgrader) Finish(ctx context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
+func (s *ServiceUpgrader) Finish(_ context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
 	return s.result, nil
 }

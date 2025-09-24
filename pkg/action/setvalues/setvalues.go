@@ -12,7 +12,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type valueSetter struct {
+type ValueSetter struct {
 	catalogs     onyxia.Catalogs
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
@@ -20,8 +20,8 @@ type valueSetter struct {
 	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)) *valueSetter {
-	return &valueSetter{
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)) *ValueSetter {
+	return &ValueSetter{
 		kubernetes:   client,
 		helmSettings: settings,
 		catalogs:     catalogs,
@@ -34,7 +34,7 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxi
 	}
 }
 
-func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+func (s *ValueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
 	err := s.process(ctx, swr)
 	if err != nil {
 		s.result.FailedItems = append(s.result.FailedItems, swr.Release.Name)
@@ -45,7 +45,7 @@ func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease
 }
 
 // Internal function such that we can wrap the FailedItems instead of having it in each err check
-func (s *valueSetter) process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+func (s *ValueSetter) process(_ context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 	actionConfig := new(action.Configuration)
 	s.helmSettings.SetNamespace(swr.Release.Namespace)
@@ -97,6 +97,6 @@ func (s *valueSetter) process(ctx context.Context, swr onyxia.ServiceWithRelease
 	return nil
 }
 
-func (s *valueSetter) Finish(ctx context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
+func (s *ValueSetter) Finish(_ context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
 	return s.result, nil
 }

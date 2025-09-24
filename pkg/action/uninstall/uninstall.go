@@ -12,14 +12,14 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type serviceUninstaller struct {
+type ServiceUninstaller struct {
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
 	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *serviceUninstaller {
-	return &serviceUninstaller{
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *ServiceUninstaller {
+	return &ServiceUninstaller{
 		kubernetes:   client,
 		helmSettings: settings,
 	}
@@ -28,7 +28,7 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *serviceUninst
 // Process uninstalls the given service' Helm release if it has failed
 // In the future this will probably just uninstall without any checks,
 // as the checks will be in the filters before the action is run.
-func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+func (u *ServiceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
 	err := u.process(ctx, swr)
 	if err != nil {
 		u.result.FailedItems = append(u.result.FailedItems, swr.Release.Name)
@@ -39,7 +39,7 @@ func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWith
 }
 
 // Internal function such that we can wrap the FailedItems instead of having it in each err check
-func (u *serviceUninstaller) process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+func (u *ServiceUninstaller) process(_ context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 	actionConfig := new(action.Configuration)
 	u.helmSettings.SetNamespace(swr.Release.Namespace)
@@ -61,6 +61,6 @@ func (u *serviceUninstaller) process(ctx context.Context, swr onyxia.ServiceWith
 	return nil
 }
 
-func (u *serviceUninstaller) Finish(ctx context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
+func (u *ServiceUninstaller) Finish(_ context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
 	return u.result, nil
 }
