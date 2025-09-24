@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"log/slog"
 	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/action/notify"
@@ -33,6 +35,7 @@ type config struct {
 	Catalogs             onyxia.Catalogs                `env:"ONYXIA_CATALOGS,required,notEmpty"`
 	OnyxiaMetadataFilter pipe.Filter[onyxia.Service]    `env:"ONYXIA_METADATA_FILTER" envDefault:"true"`
 	HelmReleaseFilter    pipe.Filter[v1release.Release] `env:"HELM_RELEASE_FILTER" envDefault:"true"`
+	PushGatewayUrl       string                       	`env:"PUSH_GATEWAY_URL"`
 }
 
 type notifyConfig struct {
@@ -213,8 +216,26 @@ func main() {
 		}
 	}
 
-	if err, _ := serviceAction.Finish(ctx); err != nil {
+	result, err := serviceAction.Finish(ctx)
+	if err != nil {
 		slog.Error("failed to finish action", "err", err)
+	}
+
+	if cfg.PushGatewayUrl != "" {
+		pushToPushgateway(cfg, result)
+	}
+
+	slog.Info("onyxia-janitor finished", "action", cfg.Action, "successful_count", result.SuccessfulCount, "failed_items_type", result.FailedItemsType, "failed_items", result.FailedItems)
+}
+
+func pushToPushgateway(cfg config, result *pkg.ServiceWithReleaseActionResult) {
+	reg := prometheus.NewRegistry()
+	m := NewMetrics(reg)
+	m.successItemsTotal.WithLabelValues(cfg.Action).Add(float64(result.SuccessfulCount))
+	m.failedItemsCount.WithLabelValues(cfg.Action).Add(float64(len(result.FailedItems)))
+	err := push.New(cfg.PushGatewayUrl, "onyxia-janitor").Gatherer(reg).Push()
+	if err != nil {
+		slog.Error("Failed to push to pushgateway", "err", err)
 	}
 }
 
@@ -287,4 +308,31 @@ func releaserToV1Release(rel release.Releaser) (*v1release.Release, error) {
 	default:
 		return nil, fmt.Errorf("unsupported release type: %T", rel)
 	}
+}
+
+type Metrics struct {
+	failedItemsCount  *prometheus.CounterVec
+	successItemsTotal *prometheus.CounterVec
+}
+
+func NewMetrics(reg prometheus.Registerer) *Metrics {
+	m := &Metrics{
+		failedItemsCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "onyxia_janitor_failed_items_total",
+				Help: "Number of items that failed to be processed",
+			},
+			[]string{"action"},
+		),
+		successItemsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "onyxia_janitor_successful_count_total",
+				Help: "Number of items that was processed successfully",
+			},
+			[]string{"action"},
+		),
+	}
+	reg.MustRegister(m.failedItemsCount)
+	reg.MustRegister(m.successItemsTotal)
+	return m
 }
