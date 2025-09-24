@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"log/slog"
 	"onyxia-janitor/pkg/action/notify"
 	"onyxia-janitor/pkg/action/setvalues"
@@ -75,16 +74,8 @@ func main() {
 	k8sClient, helmSettings := initializeKubernetesClient()
 	ctx := context.Background()
 
-	cfg, err := parseConfig[config]()
-	if err != nil {
-		slog.Error("parse config", "err", err.Error())
-		os.Exit(1)
-	}
+	cfg := parseConfigOrExit()
 
-	if err := cfg.Catalogs.Validate(); err != nil {
-		slog.Error("catalog spec invalid", "err", err)
-		os.Exit(1)
-	}
 
 	var serviceAction ServiceWithReleaseAction
 	switch cfg.Action {
@@ -241,6 +232,20 @@ func main() {
 	}
 }
 
+func parseConfigOrExit() config {
+	cfg, err := parseConfig[config]()
+	if err != nil {
+		slog.Error("parse config", "err", err.Error())
+		os.Exit(1)
+	}
+
+	if err := cfg.Catalogs.Validate(); err != nil {
+		slog.Error("catalog spec invalid", "err", err)
+		os.Exit(1)
+	}
+	return cfg
+}
+
 // initializeKubernetesClient initializes the Kubernetes client and Helm settings
 func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 	var config *rest.Config
@@ -252,10 +257,11 @@ func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 	}
 	config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		log.Printf("Could not use local kubeconfig: %v. Trying in-cluster configuration...", err)
+		slog.Info("Could not use local kubeconfig: %v. Trying in-cluster configuration...", err)
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			log.Fatalf("Could not use in-cluster configuration: %v", err)
+			slog.Error("Could not use in-cluster configuration: %v", err)
+			os.Exit(1)
 		}
 	}
 
