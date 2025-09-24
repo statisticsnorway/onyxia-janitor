@@ -94,7 +94,7 @@ func main() {
 			slog.Error("error reading upgrade config", "err", err)
 			os.Exit(1)
 		}
-		slog.Info("upgrade version", upgradeConfig.Version)
+		slog.Info("upgrade version " + upgradeConfig.Version)
 		serviceAction = upgrade.New(k8sClient, helmSettings, cfg.Catalogs, upgradeConfig.Version)
 	case "uninstall":
 		serviceAction = uninstall.New(k8sClient, helmSettings)
@@ -264,10 +264,10 @@ func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 	}
 	config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		slog.Info("Could not use local kubeconfig: %v. Trying in-cluster configuration...", err)
+		slog.Info("Could not use local kubeconfig. Trying in-cluster configuration...", "error", err)
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			slog.Error("Could not use in-cluster configuration: %v", err)
+			slog.Error("Could not use in-cluster configuration", "error", err)
 			os.Exit(1)
 		}
 	}

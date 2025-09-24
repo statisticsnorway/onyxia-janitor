@@ -47,6 +47,7 @@ func (t *AnonymousTemplate[T]) UnmarshalText(text []byte) error {
 
 func (t *AnonymousTemplate[T]) initTemplate(templateString string) error {
 	t.Template = template.New(templateString).Funcs(sprig.FuncMap())
+	//nolint:staticcheck
 	if _, err := t.Template.Parse(templateString); err != nil {
 		return fmt.Errorf("parse template string: %w", err)
 	}
