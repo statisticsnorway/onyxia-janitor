@@ -28,12 +28,6 @@ import (
 	"github.com/expr-lang/expr"
 )
 
-// const helmValuesFilter = ` global?.suspend ?? true`
-const onyxiaMetadataFilter = `Namespace startsWith "user-ssb-"`
-
-// const helmMetadataFilter = `true`
-const helmReleaseFilter = `(now().Sub(Info?.FirstDeployed.Time ?? now()) > duration(string(7 * 24) + "h"))`
-
 type config struct {
 	Action               string                         `env:"ACTION,required,notEmpty"`
 	Catalogs             onyxia.Catalogs                `env:"ONYXIA_CATALOGS,required,notEmpty"`
