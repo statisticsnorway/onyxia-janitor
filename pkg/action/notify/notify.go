@@ -57,7 +57,7 @@ func New(
 		bodyTemplate:    bodyTemplate,
 		result: &pkg.ServiceWithReleaseActionResult{
 			FailedItems:     make([]string, 0),
-			FailedItemType:  pkg.User,
+			FailedItemsType: pkg.User,
 			SuccessfulCount: 0,
 		},
 	}

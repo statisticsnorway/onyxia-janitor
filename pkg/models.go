@@ -14,7 +14,7 @@ const (
 
 type ServiceWithReleaseActionResult struct {
 	FailedItems     []string
-	FailedItemType  FailedItemType
+	FailedItemsType FailedItemType
 	SuccessfulCount int
 }
 

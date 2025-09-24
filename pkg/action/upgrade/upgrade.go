@@ -28,7 +28,7 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxi
 		version:      version,
 		result: &pkg.ServiceWithReleaseActionResult{
 			FailedItems:     make([]string, 0),
-			FailedItemType:  pkg.Release,
+			FailedItemsType: pkg.Release,
 			SuccessfulCount: 0,
 		},
 	}
