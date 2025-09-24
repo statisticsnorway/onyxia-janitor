@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"onyxia-janitor/pkg/action/notify"
 	"onyxia-janitor/pkg/action/setvalues"
-	"onyxia-janitor/pkg/action/suspend"
 	"onyxia-janitor/pkg/action/uninstall"
 	"onyxia-janitor/pkg/action/upgrade"
 	"onyxia-janitor/pkg/onyxia"
@@ -73,8 +72,6 @@ func main() {
 
 	var serviceAction ServiceWithReleaseAction
 	switch cfg.Action {
-	case "suspend":
-		serviceAction = suspend.New(k8sClient, helmSettings, cfg.Catalogs)
 	case "setvalues":
 		setValuesConfig, err := parseConfig[setValuesConfig]()
 		if err != nil {
