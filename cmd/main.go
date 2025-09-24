@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/action/notify"
 	"onyxia-janitor/pkg/action/setvalues"
 	"onyxia-janitor/pkg/action/uninstall"
@@ -57,11 +58,6 @@ func parseConfig[T any]() (T, error) {
 	})
 }
 
-type ServiceWithReleaseAction interface {
-	Process(ctx context.Context, swr onyxia.ServiceWithRelease) error
-	Finish(ctx context.Context) error
-}
-
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: getLogLevelFromEnv()})))
 	k8sClient, helmSettings := initializeKubernetesClient()
@@ -69,8 +65,7 @@ func main() {
 
 	cfg := parseConfigOrExit()
 
-
-	var serviceAction ServiceWithReleaseAction
+	var serviceAction pkg.ServiceWithReleaseAction
 	switch cfg.Action {
 	case "setvalues":
 		setValuesConfig, err := parseConfig[setValuesConfig]()
@@ -218,7 +213,7 @@ func main() {
 		}
 	}
 
-	if err := serviceAction.Finish(ctx); err != nil {
+	if err, _ := serviceAction.Finish(ctx); err != nil {
 		slog.Error("failed to finish action", "err", err)
 	}
 }

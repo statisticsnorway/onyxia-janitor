@@ -3,6 +3,7 @@ package uninstall
 import (
 	"context"
 	"log/slog"
+	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/onyxia"
 
 	"helm.sh/helm/v4/pkg/action"
@@ -14,6 +15,7 @@ import (
 type serviceUninstaller struct {
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
+	result       *pkg.ServiceWithReleaseActionResult
 }
 
 func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *serviceUninstaller {
@@ -27,6 +29,17 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *serviceUninst
 // In the future this will probably just uninstall without any checks,
 // as the checks will be in the filters before the action is run.
 func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+	err := u.process(ctx, swr)
+	if err != nil {
+		u.result.FailedItems = append(u.result.FailedItems, swr.Release.Name)
+		return err
+	}
+	u.result.SuccessfulCount++
+	return nil
+}
+
+// Internal function such that we can wrap the FailedItems instead of having it in each err check
+func (u *serviceUninstaller) process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 	actionConfig := new(action.Configuration)
 	u.helmSettings.SetNamespace(swr.Release.Namespace)
@@ -48,6 +61,6 @@ func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWith
 	return nil
 }
 
-func (u *serviceUninstaller) Finish(ctx context.Context) error {
-	return nil
+func (u *serviceUninstaller) Finish(ctx context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
+	return u.result, nil
 }

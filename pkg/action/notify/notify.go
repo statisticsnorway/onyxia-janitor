@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"onyxia-janitor/pkg"
 	"strings"
 
 	"onyxia-janitor/pkg/onyxia"
@@ -28,6 +29,8 @@ type emailNotifier struct {
 
 	emailSender    EmailSender
 	userInfoGetter UserInfoGetter
+
+	result *pkg.ServiceWithReleaseActionResult
 }
 
 type EmailSender interface {
@@ -52,6 +55,11 @@ func New(
 		userInfoGetter:  userGetter,
 		subjectTemplate: subjectTemplate,
 		bodyTemplate:    bodyTemplate,
+		result: &pkg.ServiceWithReleaseActionResult{
+			FailedItems:     make([]string, 0),
+			FailedItemType:  pkg.User,
+			SuccessfulCount: 0,
+		},
 	}
 
 	notifier.userServices = make(map[string][]onyxia.ServiceWithRelease)
@@ -71,6 +79,7 @@ func (n *emailNotifier) Process(ctx context.Context, swr onyxia.ServiceWithRelea
 	user, err := getUsernameFromNamespace(swr.Service.Namespace)
 	if err != nil {
 		log.Error("could not deduce username from namespace", "err", err)
+		n.result.FailedItems = append(n.result.FailedItems, swr.Service.Namespace)
 		return err
 	}
 
@@ -79,15 +88,17 @@ func (n *emailNotifier) Process(ctx context.Context, swr onyxia.ServiceWithRelea
 }
 
 // Finish sends emails to all the users about the services processed in Process
-func (n *emailNotifier) Finish(ctx context.Context) error {
+func (n *emailNotifier) Finish(ctx context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
 	for user := range n.userServices {
 		if err := n.notifyUser(ctx, user); err != nil {
 			slog.Error("failed to notify user", "user", user)
+			n.result.FailedItems = append(n.result.FailedItems, user)
 		} else {
 			slog.Info("successfully notified user", "user", user)
+			n.result.SuccessfulCount++
 		}
 	}
-	return nil
+	return n.result, nil
 }
 
 // notifyUser sends an email to one user about their old services.
