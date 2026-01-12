@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"onyxia-janitor/pkg/onyxia"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release/common"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -30,11 +30,11 @@ func (u *serviceUninstaller) Process(ctx context.Context, swr onyxia.ServiceWith
 	log := swr.AddToLogger(slog.Default())
 	actionConfig := new(action.Configuration)
 	u.helmSettings.SetNamespace(swr.Release.Namespace)
-	if err := actionConfig.Init(u.helmSettings.RESTClientGetter(), swr.Release.Namespace, "", log.Debug); err != nil {
+	if err := actionConfig.Init(u.helmSettings.RESTClientGetter(), swr.Release.Namespace, ""); err != nil {
 		log.Error("error initializing config for release uninstall", "err", err)
 		return err
 	}
-	if swr.Release.Info.Status != release.StatusFailed {
+	if swr.Release.Info.Status != common.StatusFailed {
 		return nil
 	}
 	uninstallAction := action.NewUninstall(actionConfig)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"log/slog"
 	"onyxia-janitor/pkg/action/notify"
@@ -16,9 +17,10 @@ import (
 	"reflect"
 	"strings"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/cli"
-	"helm.sh/helm/v3/pkg/release"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/release"
+	v1release "helm.sh/helm/v4/pkg/release/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -34,10 +36,10 @@ const onyxiaMetadataFilter = `Namespace startsWith "user-ssb-"`
 const helmReleaseFilter = `(now().Sub(Info?.FirstDeployed.Time ?? now()) > duration(string(7 * 24) + "h"))`
 
 type config struct {
-	Action               string                       `env:"ACTION,required,notEmpty"`
-	Catalogs             onyxia.Catalogs              `env:"ONYXIA_CATALOGS,required,notEmpty"`
-	OnyxiaMetadataFilter pipe.Filter[onyxia.Service]  `env:"ONYXIA_METADATA_FILTER" envDefault:"true"`
-	HelmReleaseFilter    pipe.Filter[release.Release] `env:"HELM_RELEASE_FILTER" envDefault:"true"`
+	Action               string                         `env:"ACTION,required,notEmpty"`
+	Catalogs             onyxia.Catalogs                `env:"ONYXIA_CATALOGS,required,notEmpty"`
+	OnyxiaMetadataFilter pipe.Filter[onyxia.Service]    `env:"ONYXIA_METADATA_FILTER" envDefault:"true"`
+	HelmReleaseFilter    pipe.Filter[v1release.Release] `env:"HELM_RELEASE_FILTER" envDefault:"true"`
 }
 
 type notifyConfig struct {
@@ -166,16 +168,22 @@ func main() {
 
 	releaseMapper := func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
 		actionConfig := &action.Configuration{}
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, "", slog.Debug); err != nil {
+		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
 			slog.Error("init action config get metadata", "service", s)
 			return nil, err
 		}
 		client := action.NewGet(actionConfig)
-		release, err := client.Run(s.Name)
+		helmRelease, err := client.Run(s.Name)
 		if err != nil {
 			slog.Error("get helm release", "service", s)
 			return nil, err
 		}
+		release, err := releaserToV1Release(helmRelease)
+		if err != nil {
+			slog.Error("cast helm release to manifest v1", "service", s)
+			return nil, err
+		}
+
 		return &onyxia.ServiceWithRelease{
 			Service: s,
 			Release: *release,
@@ -188,16 +196,22 @@ func main() {
 	releaseFilter := pipe.Filter[onyxia.ServiceWithRelease](func(swr onyxia.ServiceWithRelease) bool {
 		s := swr.Service
 		actionConfig := &action.Configuration{}
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, "", slog.Debug); err != nil {
+		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
 			slog.Error("init action config get metadata", "service", s)
 			return false
 		}
 		client := action.NewGet(actionConfig)
-		release, err := client.Run(s.Name)
+		helmRelease, err := client.Run(s.Name)
 		if err != nil {
 			slog.Error("get helm release", "service", s)
 			return false
 		}
+		release, err := releaserToV1Release(helmRelease)
+		if err != nil {
+			slog.Error("cast helm release to manifest v1", "service", s)
+			return false
+		}
+
 		if !cfg.Catalogs[s.Catalog].FilterRelease(*release) {
 			return false
 		}
@@ -264,5 +278,21 @@ func getLogLevelFromEnv() slog.Level {
 		return slog.LevelError
 	default:
 		return slog.LevelInfo
+	}
+}
+
+// https://github.com/helm/helm/blob/3120e88f9bab2aa0ce5d0dac1c467f4528054ed9/pkg/storage/driver/driver.go#L109
+// releaserToV1Release is a helper function to convert a v1 release passed by interface
+// into the type object.
+func releaserToV1Release(rel release.Releaser) (*v1release.Release, error) {
+	switch r := rel.(type) {
+	case v1release.Release:
+		return &r, nil
+	case *v1release.Release:
+		return r, nil
+	case nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unsupported release type: %T", rel)
 	}
 }
