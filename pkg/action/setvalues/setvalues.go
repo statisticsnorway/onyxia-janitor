@@ -3,6 +3,7 @@ package setvalues
 import (
 	"context"
 	"log/slog"
+	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/onyxia"
 
 	"helm.sh/helm/v4/pkg/action"
@@ -11,26 +12,41 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type valueSetter struct {
+type ValueSetter struct {
 	catalogs     onyxia.Catalogs
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
 	valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)
+	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)) *valueSetter {
-	return &valueSetter{
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)) *ValueSetter {
+	return &ValueSetter{
 		kubernetes:   client,
 		helmSettings: settings,
 		catalogs:     catalogs,
 		valuesMapper: valuesMapper,
+		result: &pkg.ServiceWithReleaseActionResult{
+			FailedItems:     make([]string, 0),
+			FailedItemsType: pkg.Release,
+			SuccessfulCount: 0,
+		},
 	}
 }
 
-// Process sets .global.suspend=true for the given service.
-func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
-	log := swr.AddToLogger(slog.Default())
+func (s *ValueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+	err := s.process(ctx, swr)
+	if err != nil {
+		s.result.FailedItems = append(s.result.FailedItems, swr.Release.Name)
+		return err
+	}
+	s.result.SuccessfulCount++
+	return nil
+}
 
+// Internal function such that we can wrap the FailedItems instead of having it in each err check
+func (s *ValueSetter) process(_ context.Context, swr onyxia.ServiceWithRelease) error {
+	log := swr.AddToLogger(slog.Default())
 	actionConfig := new(action.Configuration)
 	s.helmSettings.SetNamespace(swr.Release.Namespace)
 	if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), swr.Release.Namespace, ""); err != nil {
@@ -81,6 +97,6 @@ func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease
 	return nil
 }
 
-func (s *valueSetter) Finish(ctx context.Context) error {
-	return nil
+func (s *ValueSetter) Finish(_ context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
+	return s.result, nil
 }

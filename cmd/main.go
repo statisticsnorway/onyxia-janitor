@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 	"log/slog"
+	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/action/notify"
 	"onyxia-janitor/pkg/action/setvalues"
-	"onyxia-janitor/pkg/action/suspend"
 	"onyxia-janitor/pkg/action/uninstall"
 	"onyxia-janitor/pkg/action/upgrade"
 	"onyxia-janitor/pkg/onyxia"
@@ -29,17 +30,12 @@ import (
 	"github.com/expr-lang/expr"
 )
 
-// const helmValuesFilter = ` global?.suspend ?? true`
-const onyxiaMetadataFilter = `Namespace startsWith "user-ssb-"`
-
-// const helmMetadataFilter = `true`
-const helmReleaseFilter = `(now().Sub(Info?.FirstDeployed.Time ?? now()) > duration(string(7 * 24) + "h"))`
-
 type config struct {
 	Action               string                         `env:"ACTION,required,notEmpty"`
 	Catalogs             onyxia.Catalogs                `env:"ONYXIA_CATALOGS,required,notEmpty"`
 	OnyxiaMetadataFilter pipe.Filter[onyxia.Service]    `env:"ONYXIA_METADATA_FILTER" envDefault:"true"`
 	HelmReleaseFilter    pipe.Filter[v1release.Release] `env:"HELM_RELEASE_FILTER" envDefault:"true"`
+	PushGatewayUrl       string                         `env:"PUSH_GATEWAY_URL"`
 }
 
 type notifyConfig struct {
@@ -65,31 +61,15 @@ func parseConfig[T any]() (T, error) {
 	})
 }
 
-type ServiceWithReleaseAction interface {
-	Process(ctx context.Context, swr onyxia.ServiceWithRelease) error
-	Finish(ctx context.Context) error
-}
-
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: getLogLevelFromEnv()})))
 	k8sClient, helmSettings := initializeKubernetesClient()
 	ctx := context.Background()
 
-	cfg, err := parseConfig[config]()
-	if err != nil {
-		slog.Error("parse config", "err", err.Error())
-		os.Exit(1)
-	}
+	cfg := parseConfigOrExit()
 
-	if err := cfg.Catalogs.Validate(); err != nil {
-		slog.Error("catalog spec invalid", "err", err)
-		os.Exit(1)
-	}
-
-	var serviceAction ServiceWithReleaseAction
+	var serviceAction pkg.ServiceWithReleaseAction
 	switch cfg.Action {
-	case "suspend":
-		serviceAction = suspend.New(k8sClient, helmSettings, cfg.Catalogs)
 	case "setvalues":
 		setValuesConfig, err := parseConfig[setValuesConfig]()
 		if err != nil {
@@ -114,7 +94,7 @@ func main() {
 			slog.Error("error reading upgrade config", "err", err)
 			os.Exit(1)
 		}
-		slog.Info("upgrade version", upgradeConfig.Version)
+		slog.Info("upgrade version " + upgradeConfig.Version)
 		serviceAction = upgrade.New(k8sClient, helmSettings, cfg.Catalogs, upgradeConfig.Version)
 	case "uninstall":
 		serviceAction = uninstall.New(k8sClient, helmSettings)
@@ -236,9 +216,41 @@ func main() {
 		}
 	}
 
-	if err := serviceAction.Finish(ctx); err != nil {
+	result, err := serviceAction.Finish(ctx)
+	if err != nil {
 		slog.Error("failed to finish action", "err", err)
 	}
+
+	if cfg.PushGatewayUrl != "" {
+		pushToPushgateway(cfg, result)
+	}
+
+	slog.Info("onyxia-janitor finished", "action", cfg.Action, "successful_count", result.SuccessfulCount, "failed_items_type", result.FailedItemsType, "failed_items", result.FailedItems)
+}
+
+func pushToPushgateway(cfg config, result *pkg.ServiceWithReleaseActionResult) {
+	reg := prometheus.NewRegistry()
+	m := NewMetrics(reg)
+	m.successItemsTotal.WithLabelValues(cfg.Action).Add(float64(result.SuccessfulCount))
+	m.failedItemsCount.WithLabelValues(cfg.Action).Add(float64(len(result.FailedItems)))
+	err := push.New(cfg.PushGatewayUrl, "onyxia-janitor").Gatherer(reg).Push()
+	if err != nil {
+		slog.Error("Failed to push to pushgateway", "err", err)
+	}
+}
+
+func parseConfigOrExit() config {
+	cfg, err := parseConfig[config]()
+	if err != nil {
+		slog.Error("parse config", "err", err.Error())
+		os.Exit(1)
+	}
+
+	if err := cfg.Catalogs.Validate(); err != nil {
+		slog.Error("catalog spec invalid", "err", err)
+		os.Exit(1)
+	}
+	return cfg
 }
 
 // initializeKubernetesClient initializes the Kubernetes client and Helm settings
@@ -252,10 +264,11 @@ func initializeKubernetesClient() (*kubernetes.Clientset, *cli.EnvSettings) {
 	}
 	config, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 	if err != nil {
-		log.Printf("Could not use local kubeconfig: %v. Trying in-cluster configuration...", err)
+		slog.Info("Could not use local kubeconfig. Trying in-cluster configuration...", "error", err)
 		config, err = rest.InClusterConfig()
 		if err != nil {
-			log.Fatalf("Could not use in-cluster configuration: %v", err)
+			slog.Error("Could not use in-cluster configuration", "error", err)
+			os.Exit(1)
 		}
 	}
 
@@ -295,4 +308,31 @@ func releaserToV1Release(rel release.Releaser) (*v1release.Release, error) {
 	default:
 		return nil, fmt.Errorf("unsupported release type: %T", rel)
 	}
+}
+
+type Metrics struct {
+	failedItemsCount  *prometheus.CounterVec
+	successItemsTotal *prometheus.CounterVec
+}
+
+func NewMetrics(reg prometheus.Registerer) *Metrics {
+	m := &Metrics{
+		failedItemsCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "onyxia_janitor_failed_items_total",
+				Help: "Number of items that failed to be processed",
+			},
+			[]string{"action"},
+		),
+		successItemsTotal: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "onyxia_janitor_successful_count_total",
+				Help: "Number of items that was processed successfully",
+			},
+			[]string{"action"},
+		),
+	}
+	reg.MustRegister(m.failedItemsCount)
+	reg.MustRegister(m.successItemsTotal)
+	return m
 }

@@ -3,6 +3,7 @@ package upgrade
 import (
 	"context"
 	"log/slog"
+	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/onyxia"
 
 	"helm.sh/helm/v4/pkg/action"
@@ -11,23 +12,40 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-type serviceUpgrader struct {
+type ServiceUpgrader struct {
 	catalogs     onyxia.Catalogs
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
 	version      string
+	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, version string) *serviceUpgrader {
-	return &serviceUpgrader{
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, version string) *ServiceUpgrader {
+	return &ServiceUpgrader{
 		kubernetes:   client,
 		helmSettings: settings,
 		catalogs:     catalogs,
 		version:      version,
+		result: &pkg.ServiceWithReleaseActionResult{
+			FailedItems:     make([]string, 0),
+			FailedItemsType: pkg.Release,
+			SuccessfulCount: 0,
+		},
 	}
 }
 
-func (s *serviceUpgrader) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+func (s *ServiceUpgrader) Process(ctx context.Context, swr onyxia.ServiceWithRelease) error {
+	err := s.process(ctx, swr)
+	if err != nil {
+		s.result.FailedItems = append(s.result.FailedItems, swr.Release.Name)
+		return err
+	}
+	s.result.SuccessfulCount++
+	return nil
+}
+
+// Internal function such that we can wrap the FailedItems instead of having it in each err check
+func (s *ServiceUpgrader) process(_ context.Context, swr onyxia.ServiceWithRelease) error {
 	log := swr.AddToLogger(slog.Default())
 
 	actionConfig := new(action.Configuration)
@@ -75,6 +93,6 @@ func (s *serviceUpgrader) Process(ctx context.Context, swr onyxia.ServiceWithRel
 	return nil
 }
 
-func (s *serviceUpgrader) Finish(ctx context.Context) error {
-	return nil
+func (s *ServiceUpgrader) Finish(_ context.Context) (*pkg.ServiceWithReleaseActionResult, error) {
+	return s.result, nil
 }

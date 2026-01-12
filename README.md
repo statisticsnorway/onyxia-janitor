@@ -26,12 +26,13 @@ and some are needed exclusively by the `notify` action.
 ### Common configuration
 
 | Name                                  | Description                                                                                                                                                       | Required | Default |
-| ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
-| ONYXIA_JANITOR_ACTION                 | One of [suspend, notify, uninstall, setvalues, upgrade]                                                                                                           | x        |         |
+|---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
+| ONYXIA_JANITOR_ACTION                 | One of [notify, uninstall, setvalues, upgrade]                                                                                                                    | x        |         |
 | ONYXIA_JANITOR_ONYXIA_CATALOGS        | [YAML map of catalogs](#onyxia-catalog-configuration)                                                                                                             | x        |         |
 | ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct                                       |          | `true`  |
 | ONYXIA_JANITOR_HELM_RELEASE_FILTER    | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Release](https://pkg.go.dev/helm.sh/helm/v3@v3.17.1/pkg/release#Release) struct |          | `true`  |
 | GO_LOG                                | Logging level for the application. Useful for debugging or printing out expr evaluations                                                                          |          | `info`  |
+| PUSH_GATEWAY_URL                      | URL to push gateway, which will be used to push metrics                                                                                                           |          |         |
 
 ### Extra configuration for `notify` action
 
@@ -89,6 +90,8 @@ BODY
 
 The `setvalues` action run helm upgrade with a provided map. This is useful to update the values used by the services in
 a effective and safe way vs. manually editing or running helm upgrade from the command line locally.
+
+This action  replaces the `suspend` action.
 
 | Name                         | Description                                                                                                                                                                                                | Required | Default |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |

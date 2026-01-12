@@ -66,7 +66,7 @@ func (c *client) SendEmail(userEmail, subject, body string) error {
 	if err != nil {
 		return fmt.Errorf("send email to %q: %w", userEmail, err)
 	}
-	defer res.Body.Close()
+	defer res.Body.Close() //nolint:errcheck
 
 	switch res.StatusCode {
 	case http.StatusOK:
@@ -94,7 +94,7 @@ func (c *client) GetUser(userPrincipalEmail string) (*UserInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get user info for %q: %w", userPrincipalEmail, err)
 	}
-	defer res.Body.Close()
+	defer res.Body.Close() //nolint:errcheck
 
 	switch res.StatusCode {
 	case http.StatusOK:
