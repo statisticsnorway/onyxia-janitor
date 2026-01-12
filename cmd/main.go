@@ -35,7 +35,7 @@ type config struct {
 	Catalogs             onyxia.Catalogs                `env:"ONYXIA_CATALOGS,required,notEmpty"`
 	OnyxiaMetadataFilter pipe.Filter[onyxia.Service]    `env:"ONYXIA_METADATA_FILTER" envDefault:"true"`
 	HelmReleaseFilter    pipe.Filter[v1release.Release] `env:"HELM_RELEASE_FILTER" envDefault:"true"`
-	PushGatewayUrl       string                       	`env:"PUSH_GATEWAY_URL"`
+	PushGatewayUrl       string                         `env:"PUSH_GATEWAY_URL"`
 }
 
 type notifyConfig struct {
