@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"onyxia-janitor/pkg/onyxia"
 
-	"helm.sh/helm/v3/pkg/action"
-	"helm.sh/helm/v3/pkg/chart/loader"
-	"helm.sh/helm/v3/pkg/cli"
+	"helm.sh/helm/v4/pkg/action"
+	"helm.sh/helm/v4/pkg/chart/loader"
+	"helm.sh/helm/v4/pkg/cli"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -33,7 +33,7 @@ func (s *valueSetter) Process(ctx context.Context, swr onyxia.ServiceWithRelease
 
 	actionConfig := new(action.Configuration)
 	s.helmSettings.SetNamespace(swr.Release.Namespace)
-	if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), swr.Release.Namespace, "", log.Debug); err != nil {
+	if err := actionConfig.Init(s.helmSettings.RESTClientGetter(), swr.Release.Namespace, ""); err != nil {
 		log.Error("error initializing config for setvalues", "err", err)
 		return err
 	}

@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/Masterminds/sprig/v3"
-
-	helmtime "helm.sh/helm/v3/pkg/time"
 )
 
 // AnonymousTemplate wraps a *template.Template and implements the
@@ -40,10 +38,6 @@ func (t *AnonymousTemplate[T]) UnmarshalYAML(unmarshal func(any) error) error {
 		return err
 	}
 	return nil
-}
-
-func daysSince(t helmtime.Time) int {
-	return int(helmtime.Now().Sub(t).Hours() / 24)
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.

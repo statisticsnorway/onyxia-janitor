@@ -6,8 +6,8 @@ import (
 
 	"github.com/expr-lang/expr"
 	"go.yaml.in/yaml/v3"
-	"helm.sh/helm/v3/pkg/chart"
-	"helm.sh/helm/v3/pkg/release"
+	chart "helm.sh/helm/v4/pkg/chart/v2"
+	release "helm.sh/helm/v4/pkg/release/v1"
 )
 
 type Catalogs map[string]Catalog
