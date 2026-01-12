@@ -65,6 +65,8 @@ func (s *serviceSuspender) Process(ctx context.Context, swr onyxia.ServiceWithRe
 	upgradeAction.Namespace = swr.Release.Namespace
 	upgradeAction.Version = swr.Release.Chart.Metadata.Version
 	upgradeAction.ReuseValues = true
+	upgradeAction.ForceConflicts = true
+	upgradeAction.ServerSideApply = "true"
 
 	_, err = upgradeAction.Run(swr.Release.Name, chart, suspendValues)
 	if err != nil {

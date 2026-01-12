@@ -63,6 +63,7 @@ func (s *serviceUpgrader) Process(ctx context.Context, swr onyxia.ServiceWithRel
 	upgradeAction.Version = s.version
 	upgradeAction.ReuseValues = true
 	upgradeAction.ForceConflicts = true
+	upgradeAction.ServerSideApply = "true"
 
 	_, err = upgradeAction.Run(swr.Release.Name, chart, values)
 	if err != nil {
