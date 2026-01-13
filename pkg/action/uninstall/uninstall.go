@@ -22,6 +22,11 @@ func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *ServiceUninst
 	return &ServiceUninstaller{
 		kubernetes:   client,
 		helmSettings: settings,
+		result: &pkg.ServiceWithReleaseActionResult{
+			FailedItems:     make([]string, 0),
+			FailedItemsType: pkg.Release,
+			SuccessfulCount: 0,
+		},
 	}
 }
 
