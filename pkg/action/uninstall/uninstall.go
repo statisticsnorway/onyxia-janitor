@@ -8,6 +8,7 @@ import (
 
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/kube"
 	"helm.sh/helm/v4/pkg/release/common"
 	"k8s.io/client-go/kubernetes"
 )
@@ -56,6 +57,8 @@ func (u *ServiceUninstaller) process(_ context.Context, swr onyxia.ServiceWithRe
 		return nil
 	}
 	uninstallAction := action.NewUninstall(actionConfig)
+	uninstallAction.WaitStrategy = kube.HookOnlyStrategy
+
 	slog.Debug("Running uninstall action", "action", uninstallAction)
 	_, err := uninstallAction.Run(swr.Release.Name)
 	if err != nil {
