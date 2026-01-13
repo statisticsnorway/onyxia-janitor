@@ -1,0 +1,22 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "adapter": "Delve",
+    "label": "onyxia janitor (Delve)",
+    "request": "launch",
+    "mode": "debug",
+    "program": "./cmd",
+    "args": [],
+    "env": {
+      "ONYXIA_JANITOR_ACTION": "uninstall",
+      "ONYXIA_JANITOR_ONYXIA_METADATA_FILTER": "Namespace startsWith \"user-ssb-hnk\"",
+      "ONYXIA_JANITOR_HELM_RELEASE_FILTER": "true",
+      "GO_LOG": "debug",
+      "ONYXIA_JANITOR_ONYXIA_CATALOGS": "    dapla-lab-standard:\n      url: \"https://statisticsnorway.github.io/dapla-lab-helm-charts-standard\""
+    },
+    "stopOnEntry": false,
+  },
+]
