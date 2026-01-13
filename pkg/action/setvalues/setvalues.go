@@ -9,6 +9,7 @@ import (
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/chart/loader"
 	"helm.sh/helm/v4/pkg/cli"
+	"helm.sh/helm/v4/pkg/kube"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -86,6 +87,7 @@ func (s *ValueSetter) process(_ context.Context, swr onyxia.ServiceWithRelease) 
 	upgradeAction.ReuseValues = true
 	upgradeAction.ForceConflicts = true
 	upgradeAction.ServerSideApply = "true"
+	upgradeAction.WaitStrategy = kube.HookOnlyStrategy
 
 	_, err = upgradeAction.Run(swr.Release.Name, chart, values)
 	if err != nil {
