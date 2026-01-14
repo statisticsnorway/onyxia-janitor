@@ -104,29 +104,7 @@ func main() {
 	)
 	slog.Info("started catalog filter")
 
-	releaseMapper := func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
-		actionConfig := &action.Configuration{}
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
-			slog.Error("init action config get metadata", "service", s)
-			return nil, err
-		}
-		client := action.NewGet(actionConfig)
-		helmRelease, err := client.Run(s.Name)
-		if err != nil {
-			slog.Error("get helm release", "service", s)
-			return nil, err
-		}
-		release, err := releaserToV1Release(helmRelease)
-		if err != nil {
-			slog.Error("cast helm release to manifest v1", "service", s)
-			return nil, err
-		}
-
-		return &onyxia.ServiceWithRelease{
-			Service: s,
-			Release: *release,
-		}, nil
-	}
+	releaseMapper := onyxiaServiceToServiceWithRelease(helmSettings)
 	releaseMapOut := make(chan onyxia.ServiceWithRelease, 10)
 	go pipe.Map(ctx, releaseMapper, catalogOut, releaseMapOut)
 	slog.Info("started release mapper")
@@ -188,6 +166,32 @@ func serviceShouldBeIncluded(swr onyxia.ServiceWithRelease, helmSettings *cli.En
 		return false
 	}
 	return cfg.HelmReleaseFilter(*v1HelmRelease)
+}
+
+func onyxiaServiceToServiceWithRelease(helmSettings *cli.EnvSettings) func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
+	return func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
+		actionConfig := &action.Configuration{}
+		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
+			slog.Error("init action config get metadata", "service", s)
+			return nil, err
+		}
+		client := action.NewGet(actionConfig)
+		helmRelease, err := client.Run(s.Name)
+		if err != nil {
+			slog.Error("get helm release. this might be because the secret is present but the release is not installed", "service", s)
+			return nil, err
+		}
+		v1HelmRelease, err := releaserToV1Release(helmRelease)
+		if err != nil {
+			slog.Error("cast helm release to manifest v1", "service", s)
+			return nil, err
+		}
+
+		return &onyxia.ServiceWithRelease{
+			Service: s,
+			Release: *v1HelmRelease,
+		}, nil
+	}
 }
 
 func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubernetes.Clientset, helmSettings *cli.EnvSettings) (pkg.ServiceWithReleaseAction, error) {
