@@ -174,28 +174,7 @@ func main() {
 	slog.Info("started release mapper")
 
 	releaseFilter := pipe.Filter[onyxia.ServiceWithRelease](func(swr onyxia.ServiceWithRelease) bool {
-		s := swr.Service
-		actionConfig := &action.Configuration{}
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
-			slog.Error("init action config get metadata", "service", s)
-			return false
-		}
-		client := action.NewGet(actionConfig)
-		helmRelease, err := client.Run(s.Name)
-		if err != nil {
-			slog.Error("get helm release", "service", s)
-			return false
-		}
-		release, err := releaserToV1Release(helmRelease)
-		if err != nil {
-			slog.Error("cast helm release to manifest v1", "service", s)
-			return false
-		}
-
-		if !cfg.Catalogs[s.Catalog].FilterRelease(*release) {
-			return false
-		}
-		return cfg.HelmReleaseFilter(*release)
+		return serviceShouldBeIncluded(swr, helmSettings, cfg)
 	})
 	releaseFilterOut := make(chan onyxia.ServiceWithRelease, 10)
 	go releaseFilter.Run(
@@ -228,6 +207,30 @@ func main() {
 	slog.Info("onyxia-janitor finished", "action", cfg.Action, "successful_count", result.SuccessfulCount, "failed_items_type", result.FailedItemsType, "failed_items", result.FailedItems)
 }
 
+func serviceShouldBeIncluded(swr onyxia.ServiceWithRelease, helmSettings *cli.EnvSettings, cfg config) bool {
+	s := swr.Service
+	actionConfig := &action.Configuration{}
+	if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
+		slog.Error("init action config get metadata", "service", s)
+		return false
+	}
+	client := action.NewGet(actionConfig)
+	helmRelease, err := client.Run(s.Name)
+	if err != nil {
+		slog.Error("get helm release", "service", s)
+		return false
+	}
+	v1HelmRelease, err := releaserToV1Release(helmRelease)
+	if err != nil {
+		slog.Error("cast helm release to manifest v1", "service", s)
+		return false
+	}
+
+	if !cfg.Catalogs[s.Catalog].FilterRelease(*v1HelmRelease) {
+		return false
+	}
+	return cfg.HelmReleaseFilter(*v1HelmRelease)
+}
 func pushToPushgateway(cfg config, result *pkg.ServiceWithReleaseActionResult) {
 	reg := prometheus.NewRegistry()
 	m := NewMetrics(reg)
