@@ -68,50 +68,8 @@ func main() {
 
 	cfg := parseConfigOrExit()
 
-	var serviceAction pkg.ServiceWithReleaseAction
-	switch cfg.Action {
-	case "setvalues":
-		setValuesConfig, err := parseConfig[setValuesConfig]()
-		if err != nil {
-			slog.Error("error reading setvalues config", "err", err)
-			os.Exit(1)
-		}
-		prg, err := expr.Compile(setValuesConfig.ValuesMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeOf(map[string]any{}).Kind()), expr.WarnOnAny())
-		if err != nil {
-			slog.Error("error parsing setvalues mapper", "err", err)
-			os.Exit(1)
-		}
-		serviceAction = setvalues.New(k8sClient, helmSettings, cfg.Catalogs, func(swr onyxia.ServiceWithRelease) (map[string]any, error) {
-			res, err := expr.Run(prg, swr)
-			if err != nil {
-				return nil, err
-			}
-			return res.(map[string]any), nil
-		})
-	case "upgrade":
-		upgradeConfig, err := parseConfig[upgradeConfig]()
-		if err != nil {
-			slog.Error("error reading upgrade config", "err", err)
-			os.Exit(1)
-		}
-		slog.Info("upgrade version " + upgradeConfig.Version)
-		serviceAction = upgrade.New(k8sClient, helmSettings, cfg.Catalogs, upgradeConfig.Version)
-	case "uninstall":
-		serviceAction = uninstall.New(k8sClient, helmSettings)
-	case "notify":
-		notifyCfg, err := parseConfig[notifyConfig]()
-		if err != nil {
-			slog.Error("error reading notify config", "err", err)
-			os.Exit(1)
-		}
-		teamapi := teamapi.NewClient(
-			notifyCfg.TeamApiUrl,
-			notifyCfg.TokenUrl,
-			notifyCfg.ClientId,
-			notifyCfg.ClientSecret,
-		)
-		serviceAction = notify.New(teamapi, teamapi, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate)
-	default:
+	serviceAction, err := getServiceAction(cfg.Action, cfg.Catalogs, k8sClient, helmSettings)
+	if err != nil {
 		slog.Error("unknown action", "action", cfg.Action)
 		os.Exit(1)
 	}
@@ -146,56 +104,13 @@ func main() {
 	)
 	slog.Info("started catalog filter")
 
-	releaseMapper := func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
-		actionConfig := &action.Configuration{}
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
-			slog.Error("init action config get metadata", "service", s)
-			return nil, err
-		}
-		client := action.NewGet(actionConfig)
-		helmRelease, err := client.Run(s.Name)
-		if err != nil {
-			slog.Error("get helm release", "service", s)
-			return nil, err
-		}
-		release, err := releaserToV1Release(helmRelease)
-		if err != nil {
-			slog.Error("cast helm release to manifest v1", "service", s)
-			return nil, err
-		}
-
-		return &onyxia.ServiceWithRelease{
-			Service: s,
-			Release: *release,
-		}, nil
-	}
+	releaseMapper := onyxiaServiceToServiceWithRelease(helmSettings)
 	releaseMapOut := make(chan onyxia.ServiceWithRelease, 10)
 	go pipe.Map(ctx, releaseMapper, catalogOut, releaseMapOut)
 	slog.Info("started release mapper")
 
 	releaseFilter := pipe.Filter[onyxia.ServiceWithRelease](func(swr onyxia.ServiceWithRelease) bool {
-		s := swr.Service
-		actionConfig := &action.Configuration{}
-		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
-			slog.Error("init action config get metadata", "service", s)
-			return false
-		}
-		client := action.NewGet(actionConfig)
-		helmRelease, err := client.Run(s.Name)
-		if err != nil {
-			slog.Error("get helm release", "service", s)
-			return false
-		}
-		release, err := releaserToV1Release(helmRelease)
-		if err != nil {
-			slog.Error("cast helm release to manifest v1", "service", s)
-			return false
-		}
-
-		if !cfg.Catalogs[s.Catalog].FilterRelease(*release) {
-			return false
-		}
-		return cfg.HelmReleaseFilter(*release)
+		return serviceShouldBeIncluded(swr, helmSettings, cfg)
 	})
 	releaseFilterOut := make(chan onyxia.ServiceWithRelease, 10)
 	go releaseFilter.Run(
@@ -226,6 +141,105 @@ func main() {
 	}
 
 	slog.Info("onyxia-janitor finished", "action", cfg.Action, "successful_count", result.SuccessfulCount, "failed_items_type", result.FailedItemsType, "failed_items", result.FailedItems)
+}
+
+func serviceShouldBeIncluded(swr onyxia.ServiceWithRelease, helmSettings *cli.EnvSettings, cfg config) bool {
+	s := swr.Service
+	actionConfig := &action.Configuration{}
+	if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
+		slog.Error("init action config get metadata", "service", s)
+		return false
+	}
+	client := action.NewGet(actionConfig)
+	helmRelease, err := client.Run(s.Name)
+	if err != nil {
+		slog.Error("get helm release", "service", s)
+		return false
+	}
+	v1HelmRelease, err := releaserToV1Release(helmRelease)
+	if err != nil {
+		slog.Error("cast helm release to manifest v1", "service", s)
+		return false
+	}
+
+	if !cfg.Catalogs[s.Catalog].FilterRelease(*v1HelmRelease) {
+		return false
+	}
+	return cfg.HelmReleaseFilter(*v1HelmRelease)
+}
+
+func onyxiaServiceToServiceWithRelease(helmSettings *cli.EnvSettings) func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
+	return func(s onyxia.Service) (*onyxia.ServiceWithRelease, error) {
+		actionConfig := &action.Configuration{}
+		if err := actionConfig.Init(helmSettings.RESTClientGetter(), s.Namespace, ""); err != nil {
+			slog.Error("init action config get metadata", "service", s)
+			return nil, err
+		}
+		client := action.NewGet(actionConfig)
+		helmRelease, err := client.Run(s.Name)
+		if err != nil {
+			slog.Error("get helm release. this might be because the secret is present but the release is not installed", "service", s)
+			return nil, err
+		}
+		v1HelmRelease, err := releaserToV1Release(helmRelease)
+		if err != nil {
+			slog.Error("cast helm release to manifest v1", "service", s)
+			return nil, err
+		}
+
+		return &onyxia.ServiceWithRelease{
+			Service: s,
+			Release: *v1HelmRelease,
+		}, nil
+	}
+}
+
+func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubernetes.Clientset, helmSettings *cli.EnvSettings) (pkg.ServiceWithReleaseAction, error) {
+	switch action {
+	case "setvalues":
+		setValuesConfig, err := parseConfig[setValuesConfig]()
+		if err != nil {
+			slog.Error("error reading setvalues config", "err", err)
+			os.Exit(1)
+		}
+		prg, err := expr.Compile(setValuesConfig.ValuesMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeOf(map[string]any{}).Kind()), expr.WarnOnAny())
+		if err != nil {
+			slog.Error("error parsing setvalues mapper", "err", err)
+			os.Exit(1)
+		}
+		return setvalues.New(k8sClient, helmSettings, catalogs, func(swr onyxia.ServiceWithRelease) (map[string]any, error) {
+			res, err := expr.Run(prg, swr)
+			if err != nil {
+				return nil, err
+			}
+			return res.(map[string]any), nil
+		}), nil
+	case "upgrade":
+		upgradeConfig, err := parseConfig[upgradeConfig]()
+		if err != nil {
+			slog.Error("error reading upgrade config", "err", err)
+			os.Exit(1)
+		}
+		slog.Info("upgrade version " + upgradeConfig.Version)
+		return upgrade.New(k8sClient, helmSettings, catalogs, upgradeConfig.Version), nil
+	case "uninstall":
+		return uninstall.New(k8sClient, helmSettings), nil
+	case "notify":
+		notifyCfg, err := parseConfig[notifyConfig]()
+		if err != nil {
+			slog.Error("error reading notify config", "err", err)
+			os.Exit(1)
+		}
+		client := teamapi.NewClient(
+			notifyCfg.TeamApiUrl,
+			notifyCfg.TokenUrl,
+			notifyCfg.ClientId,
+			notifyCfg.ClientSecret,
+		)
+		return notify.New(client, client, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate), nil
+	default:
+		return nil, fmt.Errorf("unknown action %s", action)
+	}
 }
 
 func pushToPushgateway(cfg config, result *pkg.ServiceWithReleaseActionResult) {
