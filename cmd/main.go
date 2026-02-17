@@ -3,20 +3,22 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/push"
 	"log/slog"
 	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/action/notify"
 	"onyxia-janitor/pkg/action/setvalues"
 	"onyxia-janitor/pkg/action/uninstall"
 	"onyxia-janitor/pkg/action/upgrade"
+	"onyxia-janitor/pkg/daplaapi"
 	"onyxia-janitor/pkg/onyxia"
 	"onyxia-janitor/pkg/pipe"
 	"onyxia-janitor/pkg/teamapi"
 	"os"
 	"reflect"
 	"strings"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/push"
 
 	"helm.sh/helm/v4/pkg/action"
 	"helm.sh/helm/v4/pkg/cli"
@@ -45,6 +47,8 @@ type notifyConfig struct {
 	ClientId        string               `env:"CLIENT_ID,required,notEmpty"`
 	TokenUrl        string               `env:"TOKEN_URL,required,notEmpty"`
 	TeamApiUrl      string               `env:"TEAM_API_URL,required,notEmpty"`
+	DaplaApiUrl     string               `env:"DAPLA_API_URL,required,notEmpty"`
+	DaplaApiSaToken string               `env:"DAPLA_API_SA_TOKEN,required,notEmpty"`
 }
 
 type setValuesConfig struct {
@@ -236,7 +240,11 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubern
 			notifyCfg.ClientId,
 			notifyCfg.ClientSecret,
 		)
-		return notify.New(client, client, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate), nil
+		daplaApiClient := daplaapi.NewClient(
+			notifyCfg.DaplaApiUrl,
+			notifyCfg.DaplaApiSaToken,
+		)
+		return notify.New(client, daplaApiClient, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate), nil
 	default:
 		return nil, fmt.Errorf("unknown action %s", action)
 	}
