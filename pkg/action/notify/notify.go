@@ -8,13 +8,12 @@ import (
 	"strings"
 
 	"onyxia-janitor/pkg/onyxia"
-	"onyxia-janitor/pkg/teamapi"
 	"onyxia-janitor/pkg/template"
 )
 
 // ServicesAndUserInfo is provided as the context for the email templates.
 type ServicesAndUserInfo struct {
-	UserInfo teamapi.UserInfo
+	UserInfo UserInfo
 	Services []onyxia.ServiceWithRelease
 	Username string
 }
@@ -38,7 +37,7 @@ type EmailSender interface {
 }
 
 type UserInfoGetter interface {
-	GetUser(userPrincipalName string) (*teamapi.UserInfo, error)
+	GetUser(userPrincipalName string) (*UserInfo, error)
 }
 
 type optFunc func(*EmailNotifier)
@@ -101,6 +100,13 @@ func (n *EmailNotifier) Finish(ctx context.Context) (*pkg.ServiceWithReleaseActi
 	return n.result, nil
 }
 
+type UserInfo struct {
+	DisplayName string `json:"display_name"`
+	FirstName   string `json:"first_name"`
+	LastName    string `json:"last_name"`
+	Email       string `json:"email"`
+}
+
 // notifyUser sends an email to one user about their old services.
 func (n *EmailNotifier) notifyUser(_ context.Context, user string) error {
 	services, ok := n.userServices[user]
@@ -109,7 +115,7 @@ func (n *EmailNotifier) notifyUser(_ context.Context, user string) error {
 		return nil
 	}
 	principalEmail := fmt.Sprintf("%s@ssb.no", user)
-	var ui *teamapi.UserInfo
+	var ui *UserInfo
 	if n.userInfoGetter != nil {
 		var err error
 		ui, err = n.userInfoGetter.GetUser(principalEmail)
@@ -118,7 +124,7 @@ func (n *EmailNotifier) notifyUser(_ context.Context, user string) error {
 		}
 	}
 	if ui == nil {
-		ui = &teamapi.UserInfo{DisplayName: user}
+		ui = &UserInfo{DisplayName: user}
 	}
 
 	sui := ServicesAndUserInfo{Username: user, Services: services, UserInfo: *ui}

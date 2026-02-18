@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"onyxia-janitor/pkg/action/notify"
 	"time"
 
 	"golang.org/x/oauth2/clientcredentials"
@@ -80,14 +81,7 @@ func (c *client) SendEmail(userEmail, subject, body string) error {
 	}
 }
 
-type UserInfo struct {
-	DisplayName string `json:"display_name"`
-	FirstName   string `json:"first_name"`
-	LastName    string `json:"last_name"`
-	Email       string `json:"email"`
-}
-
-func (c *client) GetUser(userPrincipalEmail string) (*UserInfo, error) {
+func (c *client) GetUser(userPrincipalEmail string) (*notify.UserInfo, error) {
 	endpoint := fmt.Sprintf("%s/users/%s", c.teamApiUrl, userPrincipalEmail)
 
 	res, err := c.httpClient.Get(endpoint)
@@ -98,7 +92,7 @@ func (c *client) GetUser(userPrincipalEmail string) (*UserInfo, error) {
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		var ui UserInfo
+		var ui notify.UserInfo
 		dec := json.NewDecoder(res.Body)
 		if err := dec.Decode(&ui); err != nil {
 			return nil, fmt.Errorf("decode userinfo response: %w", err)
