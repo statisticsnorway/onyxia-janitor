@@ -22,10 +22,10 @@ func NewClient(apiUrl, serviceAccountToken string, opts ...optFunc) *Client {
 	httpClient := oauth2.NewClient(context.Background(), src)
 	httpClient.Timeout = time.Second * 10
 
-	grahqlClient := graphql.NewClient(apiUrl, httpClient)
+	graphqlClient := graphql.NewClient(apiUrl, httpClient)
 
 	c := &Client{
-		graphqlClient: grahqlClient,
+		graphqlClient: graphqlClient,
 		apiUrl:        apiUrl,
 	}
 
