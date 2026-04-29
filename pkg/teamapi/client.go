@@ -48,7 +48,7 @@ type teamApiEmail struct {
 	Body    string `json:"body"`
 }
 
-func (c *client) SendEmail(userEmail, subject, body string) error {
+func (c *client) SendEmail(userEmail, subject, body string) (string, error) {
 	endpoint := fmt.Sprintf("%s/users/%s/messages", c.teamApiUrl, userEmail)
 
 	msg := teamApiMessageForUser{
@@ -65,19 +65,19 @@ func (c *client) SendEmail(userEmail, subject, body string) error {
 		bytes.NewReader(msgJson),
 	)
 	if err != nil {
-		return fmt.Errorf("send email to %q: %w", userEmail, err)
+		return "", fmt.Errorf("send email to %q: %w", userEmail, err)
 	}
 	defer res.Body.Close() //nolint:errcheck
 
 	switch res.StatusCode {
 	case http.StatusOK:
-		return nil
+		return "unknown", nil
 	case http.StatusNotFound:
-		return fmt.Errorf("team api could not find user %q", userEmail)
+		return "", fmt.Errorf("team api could not find user %q", userEmail)
 	case http.StatusUnauthorized, http.StatusForbidden, http.StatusInternalServerError:
-		return fmt.Errorf("send email to %q, team api returned %q", userEmail, res.Status)
+		return "", fmt.Errorf("send email to %q, team api returned %q", userEmail, res.Status)
 	default:
-		return fmt.Errorf("send email to %q, team api returned unknown status %q", userEmail, res.Status)
+		return "", fmt.Errorf("send email to %q, team api returned unknown status %q", userEmail, res.Status)
 	}
 }
 
