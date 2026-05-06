@@ -12,7 +12,6 @@ import (
 	"onyxia-janitor/pkg/daplaapi"
 	"onyxia-janitor/pkg/onyxia"
 	"onyxia-janitor/pkg/pipe"
-	"onyxia-janitor/pkg/teamapi"
 	"os"
 	"reflect"
 	"strings"
@@ -234,17 +233,11 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubern
 			slog.Error("error reading notify config", "err", err)
 			os.Exit(1)
 		}
-		client := teamapi.NewClient(
-			notifyCfg.TeamApiUrl,
-			notifyCfg.TokenUrl,
-			notifyCfg.ClientId,
-			notifyCfg.ClientSecret,
-		)
 		daplaApiClient := daplaapi.NewClient(
 			notifyCfg.DaplaApiUrl,
 			notifyCfg.DaplaApiSaToken,
 		)
-		return notify.New(client, daplaApiClient, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate), nil
+		return notify.New(daplaApiClient, daplaApiClient, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate), nil
 	default:
 		return nil, fmt.Errorf("unknown action %s", action)
 	}
