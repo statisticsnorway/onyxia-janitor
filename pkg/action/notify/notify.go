@@ -33,7 +33,7 @@ type EmailNotifier struct {
 }
 
 type EmailSender interface {
-	SendEmail(user, subject, body string) error
+	SendEmail(user, subject, body string) (string, error)
 }
 
 type UserInfoGetter interface {
@@ -140,12 +140,13 @@ func (n *EmailNotifier) notifyUser(_ context.Context, user string) error {
 		return err
 	}
 
-	if err := n.emailSender.SendEmail(principalEmail, subject, body); err != nil {
+	messageId, err := n.emailSender.SendEmail(principalEmail, subject, body)
+	if err != nil {
 		slog.Error("failed to send notification", "user", principalEmail, "err", err)
 		return err
 	}
 
-	slog.Info("successfully sent notification email", "user", principalEmail)
+	slog.Info("successfully sent notification email", "user", principalEmail, "messageId", messageId)
 	return nil
 }
 
