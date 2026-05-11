@@ -83,6 +83,7 @@ func (c *client) List(ctx context.Context) ([]Service, error) {
 			services = append(services, service)
 		}
 
+		cont = secrets.Continue
 		if cont == "" {
 			break
 		}
@@ -118,6 +119,7 @@ func (c *client) ListConcurrent(ctx context.Context, out chan Service) {
 			}
 		}
 
+		cont = secrets.Continue
 		if cont == "" {
 			break
 		}
