@@ -136,11 +136,6 @@ Handles listing and parsing of Onyxia secrets in the cluster.
 
 Helper package for creating concurrent pipelines.
 
-### `pkg/teamapi`
-
-Handles communication with Dapla Team API.
-Used to get user info and send emails.
-
 ### `pkg/template`
 
 Wrapper package for `html/template`, and adds the `sprig` template function library.

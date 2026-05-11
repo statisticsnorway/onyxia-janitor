@@ -49,7 +49,7 @@ func (c *Client) SendEmail(userEmail, subject, body string) (string, error) {
 		} `graphql:"sendMessage(input: $input)"`
 	}
 
-	variables := map[string]interface{}{
+	variables := map[string]any{
 		"input": sendMessageInput {
 			Recipient: userEmail,
 			Subject: subject,
