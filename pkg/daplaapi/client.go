@@ -37,31 +37,31 @@ func NewClient(apiUrl, serviceAccountToken string, opts ...optFunc) *Client {
 }
 
 func (c *Client) SendEmail(userEmail, subject, body string) (string, error) {
-	type sendMessageInput struct {
-		Recipient string
-		Subject string
-		Message string
+	type SendMessageInput struct {
+		Recipient string `json:"recipient"`
+		Subject   string `json:"subject"`
+		Message   string `json:"message"`
 	}
 
 	var sendMessageMutation struct {
-		sendMessage struct {
-			messageId string
+		SendMessage struct {
+			MessageID string `graphql:"messageId"`
 		} `graphql:"sendMessage(input: $input)"`
 	}
 
 	variables := map[string]any{
-		"input": sendMessageInput {
+		"input": SendMessageInput{
 			Recipient: userEmail,
-			Subject: subject,
-			Message: body,
+			Subject:   subject,
+			Message:   body,
 		},
 	}
 
-	err := c.graphqlClient.Mutate(context.Background(), &sendMessageMutation, variables)
+	err := c.graphqlClient.WithDebug(true).Mutate(context.Background(), &sendMessageMutation, variables)
 	if err != nil {
 		return "", fmt.Errorf("send email for dapla api failed %w", err)
 	}
-	return sendMessageMutation.sendMessage.messageId, nil
+	return sendMessageMutation.SendMessage.MessageID, nil
 }
 
 func (c *Client) GetUser(userPrincipalEmail string) (*notify.UserInfo, error) {
