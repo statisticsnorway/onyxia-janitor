@@ -42,9 +42,6 @@ type config struct {
 type notifyConfig struct {
 	SubjectTemplate notify.EmailTemplate `env:"SUBJECT_TEMPLATE,required,notEmpty"`
 	BodyTemplate    notify.EmailTemplate `env:"BODY_TEMPLATE,required,notEmpty"`
-	ClientSecret    string               `env:"CLIENT_SECRET,required,notEmpty,unset"`
-	ClientId        string               `env:"CLIENT_ID,required,notEmpty"`
-	TokenUrl        string               `env:"TOKEN_URL,required,notEmpty"`
 	DaplaApiUrl     string               `env:"DAPLA_API_URL,required,notEmpty"`
 	DaplaApiSaToken string               `env:"DAPLA_API_SA_TOKEN,required,notEmpty"`
 }
