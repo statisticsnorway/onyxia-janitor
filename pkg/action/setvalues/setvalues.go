@@ -17,14 +17,16 @@ type ValueSetter struct {
 	catalogs     onyxia.Catalogs
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
+	dryRun       bool
 	valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)
 	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)) *ValueSetter {
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, dryRun bool, catalogs onyxia.Catalogs, valuesMapper func(swr onyxia.ServiceWithRelease) (map[string]any, error)) *ValueSetter {
 	return &ValueSetter{
 		kubernetes:   client,
 		helmSettings: settings,
+		dryRun:       dryRun,
 		catalogs:     catalogs,
 		valuesMapper: valuesMapper,
 		result: &pkg.ServiceWithReleaseActionResult{
@@ -88,6 +90,10 @@ func (s *ValueSetter) process(_ context.Context, swr onyxia.ServiceWithRelease) 
 	upgradeAction.ForceConflicts = true
 	upgradeAction.ServerSideApply = "true"
 	upgradeAction.WaitStrategy = kube.HookOnlyStrategy
+	if s.dryRun {
+		upgradeAction.DryRunStrategy = action.DryRunServer
+		log.Info("running set values action with DryRunServer")
+	}
 
 	_, err = upgradeAction.Run(swr.Release.Name, chart, values)
 	if err != nil {

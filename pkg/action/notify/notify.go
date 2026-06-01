@@ -28,6 +28,7 @@ type EmailNotifier struct {
 
 	emailSender    EmailSender
 	userInfoGetter UserInfoGetter
+	dryRun         bool
 
 	result *pkg.ServiceWithReleaseActionResult
 }
@@ -41,6 +42,12 @@ type UserInfoGetter interface {
 }
 
 type optFunc func(*EmailNotifier)
+
+func WithDryRun(dryRun bool) optFunc {
+	return func(n *EmailNotifier) {
+		n.dryRun = dryRun
+	}
+}
 
 func New(
 	sender EmailSender,
@@ -138,6 +145,11 @@ func (n *EmailNotifier) notifyUser(_ context.Context, user string) error {
 	if err != nil {
 		slog.Error("failed to execute body template", "err", err)
 		return err
+	}
+
+	if n.dryRun {
+		slog.Info("Dry run. Would have sent notification email", "user", principalEmail, "subject", subject, "service_count", len(services))
+		return nil
 	}
 
 	messageId, err := n.emailSender.SendEmail(principalEmail, subject, body)

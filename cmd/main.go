@@ -33,6 +33,7 @@ import (
 
 type config struct {
 	Action               string                         `env:"ACTION,required,notEmpty"`
+	DryRun               bool                           `env:"DRY_RUN" envDefault:"false"`
 	Catalogs             onyxia.Catalogs                `env:"ONYXIA_CATALOGS,required,notEmpty"`
 	OnyxiaMetadataFilter pipe.Filter[onyxia.Service]    `env:"ONYXIA_METADATA_FILTER" envDefault:"true"`
 	HelmReleaseFilter    pipe.Filter[v1release.Release] `env:"HELM_RELEASE_FILTER" envDefault:"true"`
@@ -42,9 +43,6 @@ type config struct {
 type notifyConfig struct {
 	SubjectTemplate notify.EmailTemplate `env:"SUBJECT_TEMPLATE,required,notEmpty"`
 	BodyTemplate    notify.EmailTemplate `env:"BODY_TEMPLATE,required,notEmpty"`
-	ClientSecret    string               `env:"CLIENT_SECRET,required,notEmpty,unset"`
-	ClientId        string               `env:"CLIENT_ID,required,notEmpty"`
-	TokenUrl        string               `env:"TOKEN_URL,required,notEmpty"`
 	DaplaApiUrl     string               `env:"DAPLA_API_URL,required,notEmpty"`
 	DaplaApiSaToken string               `env:"DAPLA_API_SA_TOKEN,required,notEmpty"`
 }
@@ -70,12 +68,12 @@ func main() {
 
 	cfg := parseConfigOrExit()
 
-	serviceAction, err := getServiceAction(cfg.Action, cfg.Catalogs, k8sClient, helmSettings)
+	serviceAction, err := getServiceAction(cfg.Action, cfg.Catalogs, cfg.DryRun, k8sClient, helmSettings)
 	if err != nil {
 		slog.Error("unknown action", "action", cfg.Action)
 		os.Exit(1)
 	}
-	slog.Info("determined action", "action", cfg.Action)
+	slog.Info("determined action", "action", cfg.Action, "dry_run", cfg.DryRun)
 
 	allNamespacesSecretLister := k8sClient.CoreV1().Secrets("")
 	onyxiaClient := onyxia.New(allNamespacesSecretLister)
@@ -196,7 +194,7 @@ func onyxiaServiceToServiceWithRelease(helmSettings *cli.EnvSettings) func(s ony
 	}
 }
 
-func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubernetes.Clientset, helmSettings *cli.EnvSettings) (pkg.ServiceWithReleaseAction, error) {
+func getServiceAction(action string, catalogs onyxia.Catalogs, dryRun bool, k8sClient *kubernetes.Clientset, helmSettings *cli.EnvSettings) (pkg.ServiceWithReleaseAction, error) {
 	switch action {
 	case "setvalues":
 		setValuesConfig, err := parseConfig[setValuesConfig]()
@@ -209,7 +207,7 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubern
 			slog.Error("error parsing setvalues mapper", "err", err)
 			os.Exit(1)
 		}
-		return setvalues.New(k8sClient, helmSettings, catalogs, func(swr onyxia.ServiceWithRelease) (map[string]any, error) {
+		return setvalues.New(k8sClient, helmSettings, dryRun, catalogs, func(swr onyxia.ServiceWithRelease) (map[string]any, error) {
 			res, err := expr.Run(prg, swr)
 			if err != nil {
 				return nil, err
@@ -223,9 +221,9 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubern
 			os.Exit(1)
 		}
 		slog.Info("upgrade version " + upgradeConfig.Version)
-		return upgrade.New(k8sClient, helmSettings, catalogs, upgradeConfig.Version), nil
+		return upgrade.New(k8sClient, helmSettings, catalogs, upgradeConfig.Version, dryRun), nil
 	case "uninstall":
-		return uninstall.New(k8sClient, helmSettings), nil
+		return uninstall.New(k8sClient, helmSettings, dryRun), nil
 	case "notify":
 		notifyCfg, err := parseConfig[notifyConfig]()
 		if err != nil {
@@ -236,7 +234,7 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, k8sClient *kubern
 			notifyCfg.DaplaApiUrl,
 			notifyCfg.DaplaApiSaToken,
 		)
-		return notify.New(daplaApiClient, daplaApiClient, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate), nil
+		return notify.New(daplaApiClient, daplaApiClient, notifyCfg.SubjectTemplate, notifyCfg.BodyTemplate, notify.WithDryRun(dryRun)), nil
 	default:
 		return nil, fmt.Errorf("unknown action %s", action)
 	}

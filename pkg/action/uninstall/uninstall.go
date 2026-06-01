@@ -15,13 +15,15 @@ import (
 type ServiceUninstaller struct {
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
+	dryRun       bool
 	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings) *ServiceUninstaller {
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, dryRun bool) *ServiceUninstaller {
 	return &ServiceUninstaller{
 		kubernetes:   client,
 		helmSettings: settings,
+		dryRun:       dryRun,
 		result: &pkg.ServiceWithReleaseActionResult{
 			FailedItems:     make([]string, 0),
 			FailedItemsType: pkg.Release,
@@ -54,6 +56,10 @@ func (u *ServiceUninstaller) process(_ context.Context, swr onyxia.ServiceWithRe
 	}
 	uninstallAction := action.NewUninstall(actionConfig)
 	uninstallAction.WaitStrategy = kube.HookOnlyStrategy
+	uninstallAction.DryRun = u.dryRun
+	if u.dryRun {
+		log.Info("running uninstall action with dry run")
+	}
 
 	slog.Debug("Running uninstall action", "action", uninstallAction)
 	_, err := uninstallAction.Run(swr.Release.Name)

@@ -18,15 +18,17 @@ type ServiceUpgrader struct {
 	kubernetes   *kubernetes.Clientset
 	helmSettings *cli.EnvSettings
 	version      string
+	dryRun       bool
 	result       *pkg.ServiceWithReleaseActionResult
 }
 
-func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, version string) *ServiceUpgrader {
+func New(client *kubernetes.Clientset, settings *cli.EnvSettings, catalogs onyxia.Catalogs, version string, dryRun bool) *ServiceUpgrader {
 	return &ServiceUpgrader{
 		kubernetes:   client,
 		helmSettings: settings,
 		catalogs:     catalogs,
 		version:      version,
+		dryRun:       dryRun,
 		result: &pkg.ServiceWithReleaseActionResult{
 			FailedItems:     make([]string, 0),
 			FailedItemsType: pkg.Release,
@@ -84,6 +86,10 @@ func (s *ServiceUpgrader) process(_ context.Context, swr onyxia.ServiceWithRelea
 	upgradeAction.ForceConflicts = true
 	upgradeAction.ServerSideApply = "true"
 	upgradeAction.WaitStrategy = kube.HookOnlyStrategy
+	if s.dryRun {
+		upgradeAction.DryRunStrategy = action.DryRunServer
+		log.Info("running upgrade action with DryRunServer")
+	}
 
 	_, err = upgradeAction.Run(swr.Release.Name, chart, values)
 	if err != nil {
