@@ -96,7 +96,7 @@ This action  replaces the `suspend` action.
 
 | Name                         | Description                                                                                                                                                                                                | Required | Default |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
-| ONYXIA_JANITOR_VALUES_MAPPER | A [Expr-lang](https://expr-lang.org/playground) program that evaluets to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
+| ONYXIA_JANITOR_VALUES_MAPPER | An [Expr-lang](https://expr-lang.org/playground) program that evaluates to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
 
 ### Extra configuration for `upgrade` action
 
@@ -112,19 +112,19 @@ this can be done by setting `ONYXIA_JANITOR_HELM_RELEASE_FILTER` to e.g `Chart.M
 ### Extra configuration for `setonyxiasecret` action
 
 The `setonyxiasecret` modifies the Onyxia secret with the supplied map. 
-This is can be used to modify Onyxia-specific values. At this moment these are the values present in an Onyxia secret:
+This can be used to modify Onyxia-specific values. At this moment these are the values present in an Onyxia secret:
 
-| Key                         | Description                                                      |
-| ------------------------------ | ---------------------------------------------------------------- |
-| friendlyName | The display name the user has set for the service. |
-| owner | The owner of the service. Should equal the namespace sans the `user-` prefix. If set to something else, the service will not be visible to the user. |
-| catalog | Name of the catalog the service's Helm chart is from. E.g. `dapla-lab-standard` |
-| share | Used to share services? Unused in SSB's instance. |
+| Key          | Description                                                                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| friendlyName | The display name the user has set for the service.                                                                                                   |
+| owner        | The owner of the service. Should equal the namespace sans the `user-` prefix. If set to something else, the service will not be visible to the user. |
+| catalog      | Name of the catalog the service's Helm chart is from. E.g. `dapla-lab-standard`                                                                      |
+| share        | Used to share services? Unused in Dapla's instance.                                                                                                    |
 
 
 | Name                         | Description                                                                                                                                                                                                | Required | Default |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
-| ONYXIA_JANITOR_VALUES_MAPPER | A [Expr-lang](https://expr-lang.org/playground) program that evaluets to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
+| ONYXIA_JANITOR_SECRET_MAPPER | An [Expr-lang](https://expr-lang.org/playground) program that evaluates to a `map[string]string`. E.g. `{ owner: trimPrefix(Service.Namespace, "user-") }`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
 
 
 ### Onyxia catalog configuration
