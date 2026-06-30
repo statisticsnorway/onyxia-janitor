@@ -207,7 +207,7 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, dryRun bool, k8sC
 			slog.Error("error reading setvalues config", "err", err)
 			os.Exit(1)
 		}
-		prg, err := expr.Compile(setValuesConfig.ValuesMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeOf(map[string]any{}).Kind()), expr.WarnOnAny())
+		prg, err := expr.Compile(setValuesConfig.ValuesMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeFor[map[string]any]().Kind()), expr.WarnOnAny())
 		if err != nil {
 			slog.Error("error parsing setvalues mapper", "err", err)
 			os.Exit(1)
@@ -225,7 +225,7 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, dryRun bool, k8sC
 			slog.Error("error reading setonyxiasecret config", "err", err)
 			os.Exit(1)
 		}
-		prg, err := expr.Compile(setOnyxiaSecretConfig.SecretMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeOf(map[string]string{}).Kind()), expr.WarnOnAny())
+		prg, err := expr.Compile(setOnyxiaSecretConfig.SecretMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeFor[map[string]string]().Kind()), expr.WarnOnAny())
 		if err != nil {
 			slog.Error("error parsing setonyxiasecret mapper", "err", err)
 			os.Exit(1)
