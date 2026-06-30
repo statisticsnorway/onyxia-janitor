@@ -27,7 +27,7 @@ and some are needed exclusively by the `notify` action.
 
 | Name                                  | Description                                                                                                                                                       | Required | Default |
 |---------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|---------|
-| ONYXIA_JANITOR_ACTION                 | One of [notify, uninstall, setvalues, upgrade]                                                                                                                    | x        |         |
+| ONYXIA_JANITOR_ACTION                 | One of [notify, uninstall, setvalues, upgrade, setonyxiasecret]                                                                                                                    | x        |         |
 | ONYXIA_JANITOR_DRY_RUN                | If `true`, logs the action that would be performed without mutating services (i.e mutating Helm releases or sending notification emails                           |          | `false` |
 | ONYXIA_JANITOR_ONYXIA_CATALOGS        | [YAML map of catalogs](#onyxia-catalog-configuration)                                                                                                             | x        |         |
 | ONYXIA_JANITOR_ONYXIA_METADATA_FILTER | [expr-lang](https://expr-lang.org/docs/language-definition) filter acting on the [Service](pkg/onyxia/client.go#L28) struct                                       |          | `true`  |
@@ -96,7 +96,7 @@ This action  replaces the `suspend` action.
 
 | Name                         | Description                                                                                                                                                                                                | Required | Default |
 | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
-| ONYXIA_JANITOR_VALUES_MAPPER | A [Expr-lang](https://expr-lang.org/playground) program that evaluets to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
+| ONYXIA_JANITOR_VALUES_MAPPER | An [Expr-lang](https://expr-lang.org/playground) program that evaluates to a map. E.g. `{ global: { suspend: <expr logic or a static value> }}`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
 
 ### Extra configuration for `upgrade` action
 
@@ -108,6 +108,24 @@ this can be done by setting `ONYXIA_JANITOR_HELM_RELEASE_FILTER` to e.g `Chart.M
 | Name                           | Description                                                      | Required | Default |
 | ------------------------------ | ---------------------------------------------------------------- | -------- | ------- |
 | ONYXIA_JANITOR_UPGRADE_VERSION | A string containing a semver version of the chart. E.g. `0.15.7` | x        |         |
+
+### Extra configuration for `setonyxiasecret` action
+
+The `setonyxiasecret` modifies the Onyxia secret with the supplied map. 
+This can be used to modify Onyxia-specific values. At this moment these are the values present in an Onyxia secret:
+
+| Key          | Description                                                                                                                                          |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| friendlyName | The display name the user has set for the service.                                                                                                   |
+| owner        | The owner of the service. Should equal the namespace sans the `user-` prefix. If set to something else, the service will not be visible to the user. |
+| catalog      | Name of the catalog the service's Helm chart is from. E.g. `dapla-lab-standard`                                                                      |
+| share        | Used to share services? Unused in Dapla's instance.                                                                                                    |
+
+
+| Name                         | Description                                                                                                                                                                                                | Required | Default |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ------- |
+| ONYXIA_JANITOR_SECRET_MAPPER | An [Expr-lang](https://expr-lang.org/playground) program that evaluates to a `map[string]string`. E.g. `{ owner: trimPrefix(Service.Namespace, "user-") }`. See `onyxia.ServiceWithRelease` struct for available fields | x        |         |
+
 
 ### Onyxia catalog configuration
 
