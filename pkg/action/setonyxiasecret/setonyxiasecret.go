@@ -9,7 +9,6 @@ import (
 	"helm.sh/helm/v4/pkg/cli"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/client-go/applyconfigurations/core/v1"
-	applymetav1 "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -62,12 +61,10 @@ func (s *OnxyiaSecretSetter) process(ctx context.Context, swr onyxia.ServiceWith
 	secretsClient := s.kubernetes.CoreV1().Secrets(swr.Service.Namespace)
 
 	if _, err := secretsClient.Apply(ctx,
-		&v1.SecretApplyConfiguration{
-			ObjectMetaApplyConfiguration: &applymetav1.ObjectMetaApplyConfiguration{Name: new(onyxiaSecretPrefix + swr.Service.Name)},
-			StringData:                   values,
-		},
+		v1.Secret(onyxiaSecretPrefix+swr.Service.Name, swr.Service.Namespace).WithStringData(values),
 		metav1.ApplyOptions{
 			FieldManager: "onyxia-janitor",
+			Force:        true,
 		}); err != nil {
 		slog.Error("could not update onyxia secret", "err", err)
 	}
