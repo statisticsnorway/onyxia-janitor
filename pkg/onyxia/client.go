@@ -16,6 +16,7 @@ const onyxiaSecretType = "onyxia.sh/release.v1"
 const onyxiaSecretPrefix = "sh.onyxia.release.v1."
 const secretCatalogKey = "catalog"
 const secretFriendlyNameKey = "friendlyName"
+const secretOwnerKey = "owner"
 
 type client struct {
 	lister SecretLister
@@ -30,6 +31,7 @@ type Service struct {
 	Namespace    string
 	Catalog      string
 	FriendlyName string
+	Owner        string
 }
 
 // This struct is avaiable in expr. Fields can be accessed via .Service.[...] or .Release.[...]
@@ -141,10 +143,19 @@ func parseServiceSecret(secret corev1.Secret) (Service, error) {
 		friendlyName = []byte(name)
 	}
 
+	owner, ok := secret.Data[secretOwnerKey]
+	if !ok {
+		slog.Error("owner not found", "data", secret.Data)
+		// We could set this to strings.TrimPrefix(secret.Namespace, "user-"),
+		// but if the field does not exist, there is probably a reason (manually removed?)
+		owner = []byte("UNKNOWN")
+	}
+
 	return Service{
 		Name:         name,
 		Namespace:    secret.Namespace,
 		FriendlyName: string(friendlyName),
 		Catalog:      string(catalog),
+		Owner:        string(owner),
 	}, nil
 }
