@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"onyxia-janitor/pkg"
 	"onyxia-janitor/pkg/action/notify"
+	"onyxia-janitor/pkg/action/setonyxiasecret"
 	"onyxia-janitor/pkg/action/setvalues"
 	"onyxia-janitor/pkg/action/uninstall"
 	"onyxia-janitor/pkg/action/upgrade"
@@ -53,6 +54,10 @@ type setValuesConfig struct {
 
 type upgradeConfig struct {
 	Version string `env:"UPGRADE_VERSION,required,notEmpty"`
+}
+
+type setOnyxiaSecretConfig struct {
+	SecretMapper string `env:"SECRET_MAPPER,required,notEmpty"`
 }
 
 func parseConfig[T any]() (T, error) {
@@ -213,6 +218,24 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, dryRun bool, k8sC
 				return nil, err
 			}
 			return res.(map[string]any), nil
+		}), nil
+	case "setonyxiasecret":
+		setOnyxiaSecretConfig, err := parseConfig[setOnyxiaSecretConfig]()
+		if err != nil {
+			slog.Error("error reading setonyxiasecret config", "err", err)
+			os.Exit(1)
+		}
+		prg, err := expr.Compile(setOnyxiaSecretConfig.SecretMapper, expr.Env(onyxia.ServiceWithRelease{}), expr.AsKind(reflect.TypeOf(map[string]string{}).Kind()), expr.WarnOnAny())
+		if err != nil {
+			slog.Error("error parsing setonyxiasecret mapper", "err", err)
+			os.Exit(1)
+		}
+		return setonyxiasecret.New(k8sClient, helmSettings, dryRun, catalogs, func(swr onyxia.ServiceWithRelease) (map[string]string, error) {
+			res, err := expr.Run(prg, swr)
+			if err != nil {
+				return nil, err
+			}
+			return res.(map[string]string), nil
 		}), nil
 	case "upgrade":
 		upgradeConfig, err := parseConfig[upgradeConfig]()
