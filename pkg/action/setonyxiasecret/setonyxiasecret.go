@@ -60,12 +60,19 @@ func (s *OnxyiaSecretSetter) process(ctx context.Context, swr onyxia.ServiceWith
 
 	secretsClient := s.kubernetes.CoreV1().Secrets(swr.Service.Namespace)
 
-	if _, err := secretsClient.Apply(ctx,
+	opts := metav1.ApplyOptions{
+		FieldManager: "onyxia-janitor",
+		Force:        true,
+	}
+	if s.dryRun {
+		opts.DryRun = append(opts.DryRun, metav1.DryRunAll)
+	}
+
+	if _, err := secretsClient.Apply(
+		ctx,
 		v1.Secret(onyxiaSecretPrefix+swr.Service.Name, swr.Service.Namespace).WithStringData(values),
-		metav1.ApplyOptions{
-			FieldManager: "onyxia-janitor",
-			Force:        true,
-		}); err != nil {
+		opts,
+	); err != nil {
 		slog.Error("could not update onyxia secret", "err", err)
 	}
 
