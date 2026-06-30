@@ -235,7 +235,19 @@ func getServiceAction(action string, catalogs onyxia.Catalogs, dryRun bool, k8sC
 			if err != nil {
 				return nil, err
 			}
-			return res.(map[string]string), nil
+			resMap, ok := res.(map[string]any)
+			if !ok {
+				return nil, fmt.Errorf("secret mapper return type is not map[string]any, found %T", res)
+			}
+			out := make(map[string]string, len(resMap))
+			for k, v := range resMap {
+				if s, ok := v.(string); ok {
+					out[k] = s
+					continue
+				}
+				out[k] = fmt.Sprintf("%v", v)
+			}
+			return out, nil
 		}), nil
 	case "upgrade":
 		upgradeConfig, err := parseConfig[upgradeConfig]()
