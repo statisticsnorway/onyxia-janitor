@@ -16,4 +16,4 @@ spec:
   lifecycle: production
   system: dapla-lab
   consumesApis:
-    - dapla-team-api
+    - dapla-api
